@@ -130,7 +130,7 @@ class DuplicationGate
             }
         }
 
-        $baselineDup = $baseline->get('duplication', 'percentage', 100.0);
+        $baselineDup = $baseline->get('duplication', 'percentage', 2.0);
 
         $status = Status::Pass;
         $actions = null;
@@ -183,7 +183,7 @@ class DuplicationGate
         }
 
         $cloneCount = count($clones);
-        $baselineDup = $baseline->get('duplication', 'percentage', 100.0);
+        $baselineDup = $baseline->get('duplication', 'percentage', 2.0);
 
         $status = $cloneCount > 0 ? Status::Fail : Status::Pass;
         $actions = null;

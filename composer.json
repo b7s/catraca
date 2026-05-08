@@ -2,11 +2,12 @@
     "name": "b7s/catraca",
     "description": "PHP Quality Guardian — enforces the Catraca (ratchet) principle: quality metrics can only improve, never regress",
     "type": "library",
-    "keywords": ["quality", "catraca", "ratchet", "ci", "static-analysis", "coverage", "duplication", "grumphp"],
+    "keywords": ["quality", "catraca", "ratchet", "babysit", "ci", "static-analysis", "coverage", "duplication", "grumphp"],
     "license": "MIT",
     "authors": [
         {
-            "name": "B7S"
+            "name": "Bruno Souza",
+            "email": "me@brunots.dev"
         }
     ],
     "support": {

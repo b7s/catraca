@@ -64,6 +64,10 @@ class Catraca
 
     public function check(): CheckResult
     {
+        if (!$this->baseline->exists()) {
+            $this->baseline->init();
+        }
+
         $result = new CheckResult();
 
         foreach ($this->gates as $gateDef) {

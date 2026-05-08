@@ -10,25 +10,76 @@ PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality 
 composer require --dev b7s/catraca
 ```
 
-## Usage
+## Dependencies
 
-### CLI
+Catraca wraps your existing PHP quality tools. Install the ones you need:
 
 ```bash
-# Initialize baseline (first run)
-vendor/bin/catraca init
+# Code style
+composer require --dev laravel/pint
+# or
+composer require --dev friendsofphp/php-cs-fixer
 
-# Run quality gates
+# Static analysis
+composer require --dev phpstan/phpstan
+# or
+composer require --dev vimeo/psalm
+
+# Test coverage
+composer require --dev phpunit/phpunit
+# or
+composer require --dev pestphp/pest
+
+# Duplication detection (requires Node.js)
+npm install --save-dev jscpd
+# or
+composer require --dev sebastian/phpcpd
+
+# Cyclomatic complexity
+composer require --dev phpmetrics/phpmetrics
+```
+
+Any tool not installed is **skipped** (not failed). Security audit uses `composer audit` (built-in).
+
+## Usage
+
+### `catraca init` — Initialize baseline
+
+Creates `baseline.json` in your project root with default thresholds:
+
+```bash
+vendor/bin/catraca init
+```
+
+Default baseline:
+
+| Gate | Default |
+|------|---------|
+| Code Style | 0 violations |
+| Static Analysis | 0 errors (level 5 if no `phpstan.neon`) |
+| Test Coverage | 85% minimum |
+| Duplication | 2% maximum |
+| File Size | 1000 lines maximum per file |
+| Complexity | Block at CCN 50, warn at CCN 20 |
+
+You can edit `baseline.json` directly to adjust thresholds.
+
+### `catraca check` — Run quality gates
+
+Runs all 7 gates and compares against baseline. If `baseline.json` doesn't exist, it is created automatically.
+
+```bash
+# Human-readable (default)
 vendor/bin/catraca check
 
-# JSON output for AI / CI
+# Plain text (no colors)
+vendor/bin/catraca check --plain
+
+# JSON output for AI agents / CI
 vendor/bin/catraca check --format=json
 
 # GitHub Actions annotations
 vendor/bin/catraca check --format=github
-
-# Plain text (no ANSI colors)
-vendor/bin/catraca check --plain
 
 # Specify project path
 vendor/bin/catraca check --path=/path/to/project
@@ -41,9 +92,9 @@ vendor/bin/catraca check --path=/path/to/project
 | 0 | All gates passed |
 | 1 | One or more gates failed |
 
-### Output Formats
+## Output Formats
 
-#### Human (default)
+### Human (default)
 
 Terminal-friendly output with ANSI colors:
 
@@ -55,8 +106,8 @@ Terminal-friendly output with ANSI colors:
   ✔ Security Audit          PASS     0 total advisories, 0 critical/high
   ✔ Code Style              PASS     0 violations (baseline: 0)
   ✘ Static Analysis         FAIL     3 errors (baseline: 0)
-  ✔ Test Coverage           PASS     85.00% (baseline: 80.00%)
-  ✘ Duplication             FAIL     5.20% (baseline: 3.00%, 2 clones)
+  ✔ Test Coverage           PASS     85.00% (baseline: 85.00%)
+  ✘ Duplication             FAIL     5.20% (baseline: 2.00%, 2 clones)
   ✔ File Size               PASS     0 files exceed 1000 lines
   ✔ Cyclomatic Complexity   PASS     max CCN 8, 0 violations (>50), 1 warnings (>20)
   ────────────────────────────────────────────────────────────
@@ -69,11 +120,11 @@ Terminal-friendly output with ANSI colors:
       → app/Service.php:42
       → app/Repository.php:15
       → app/Controller.php:88
-  [2] REFACTOR DUP — Duplication increased from 3.00% to 5.20%
+  [2] REFACTOR DUP — Duplication increased from 2.00% to 5.20%
       → src/A.php:10-50 <-> src/B.php:100-140 (40L)
 ```
 
-#### JSON (for AI agents)
+### JSON (for AI agents)
 
 ```json
 {
@@ -108,62 +159,27 @@ Terminal-friendly output with ANSI colors:
 }
 ```
 
-#### GitHub Actions
+### GitHub Actions
 
-Uses `::error::`, `::warning::`, and `::group::` annotations for native GitHub integration:
-
-```yaml
-- name: Run quality gates
-  run: vendor/bin/catraca check --format=github --plain
-```
+Uses `::error::`, `::warning::`, and `::group::` annotations for native GitHub integration.
 
 ## Quality Gates
 
 Gates run in order. A failure blocks the PR.
 
-| # | Gate | Tool | Blocks |
-|---|------|------|--------|
-| 1 | Security Audit | `composer audit` | Yes |
-| 2 | Code Style | `pint` or `php-cs-fixer` | Yes |
-| 3 | Static Analysis | `phpstan` or `psalm` | Yes |
-| 4 | Test Coverage | `phpunit` or `pest` | Yes |
-| 5 | Duplication | `jscpd` or `phpcpd` | Yes |
-| 6 | File Size | Built-in | Yes |
-| 7 | Cyclomatic Complexity | `phpmetrics` | Yes |
+| # | Gate | Tool | Default Threshold |
+|---|------|------|-------------------|
+| 1 | Security Audit | `composer audit` | 0 critical/high advisories |
+| 2 | Code Style | `pint` or `php-cs-fixer` | 0 violations |
+| 3 | Static Analysis | `phpstan` or `psalm` | 0 errors (level 5 if no config) |
+| 4 | Test Coverage | `phpunit` or `pest` | 85% minimum |
+| 5 | Duplication | `jscpd` or `phpcpd` | 2% maximum |
+| 6 | File Size | Built-in | 1000 lines per file |
+| 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
 
-If a tool is not installed, the gate is **skipped** (not failed).
+### PHPStan Configuration
 
-## Baseline
-
-`baseline.json` stores the current quality metrics. On first run, use `init` to create it:
-
-```bash
-vendor/bin/catraca init
-```
-
-The `check` command compares current metrics against the baseline. Coverage must not decrease, duplication must not increase, etc.
-
-## GrumPHP Integration
-
-```php
-use GrumPHP\Runner\TaskResult;
-use GrumPHP\Task\AbstractExternalTask;
-
-class CatracaTask extends AbstractExternalTask
-{
-    public function run(): TaskResult
-    {
-        $process = $this->processBuilder->build(['vendor/bin/catraca', 'check', '--format=json']);
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            return TaskResult::createFailed($this, $this->getContext(), $process->getOutput());
-        }
-
-        return TaskResult::createPassed($this, $this->getContext());
-    }
-}
-```
+If your project has a `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon`, Catraca uses it as-is. If no config file exists, it defaults to **level 5**.
 
 ## GitHub Actions
 
@@ -191,6 +207,28 @@ jobs:
       - run: vendor/bin/catraca init --plain
         continue-on-error: true
       - run: vendor/bin/catraca check --format=github --plain
+```
+
+## GrumPHP Integration
+
+```php
+use GrumPHP\Runner\TaskResult;
+use GrumPHP\Task\AbstractExternalTask;
+
+class CatracaTask extends AbstractExternalTask
+{
+    public function run(): TaskResult
+    {
+        $process = $this->processBuilder->build(['vendor/bin/catraca', 'check', '--format=json']);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return TaskResult::createFailed($this, $this->getContext(), $process->getOutput());
+        }
+
+        return TaskResult::createPassed($this, $this->getContext());
+    }
+}
 ```
 
 ## Programmatic Usage

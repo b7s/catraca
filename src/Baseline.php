@@ -57,9 +57,9 @@ class Baseline
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
-            'coverage' => ['percentage' => 0.0],
-            'duplication' => ['percentage' => 100.0, 'clones' => []],
-            'file_size' => ['max_lines' => 0],
+            'coverage' => ['percentage' => 85.0],
+            'duplication' => ['percentage' => 2.0, 'clones' => []],
+            'file_size' => ['max_lines' => 1000],
             'complexity' => ['max_ccn' => 0],
         ]);
     }

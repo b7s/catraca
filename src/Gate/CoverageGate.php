@@ -54,7 +54,7 @@ class CoverageGate
             $coverage = $this->parseCoverageFromText($process->getOutput());
         }
 
-        $baselineCoverage = $baseline->get('coverage', 'percentage', 0.0);
+        $baselineCoverage = $baseline->get('coverage', 'percentage', 85.0);
 
         $status = Status::Pass;
         $actions = null;
@@ -93,7 +93,7 @@ class CoverageGate
         $process->run();
 
         $coverage = $this->parseCoverageFromText($process->getOutput());
-        $baselineCoverage = $baseline->get('coverage', 'percentage', 0.0);
+        $baselineCoverage = $baseline->get('coverage', 'percentage', 85.0);
 
         $status = Status::Pass;
         $actions = null;

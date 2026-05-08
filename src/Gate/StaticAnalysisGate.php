@@ -35,11 +35,20 @@ class StaticAnalysisGate
 
     private function runPhpstan(string $phpstan, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $process = new Process([
+        $projectRoot = dirname($baseline->getPath());
+
+        $args = [
             $resolver->resolvePhp(), $phpstan,
             'analyse', '--memory-limit=512M',
             '--error-format=json', '--no-progress',
-        ]);
+        ];
+
+        if (!$this->hasPhpstanConfig($projectRoot)) {
+            $args[] = '--level=5';
+        }
+
+        $process = new Process($args);
+        $process->setWorkingDirectory($projectRoot);
         $process->run();
 
         $output = $process->getOutput() ?: $process->getErrorOutput();
@@ -146,5 +155,15 @@ class StaticAnalysisGate
             actions: $actions,
             details: $errorCount > 0 ? ['errors' => array_slice($errors, 0, 100)] : null,
         );
+    }
+
+    private function hasPhpstanConfig(string $projectRoot): bool
+    {
+        foreach (['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'] as $file) {
+            if (file_exists($projectRoot . '/' . $file)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

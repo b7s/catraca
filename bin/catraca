@@ -10,5 +10,5 @@ require __DIR__ . '/../vendor/autoload.php';
 $application = new Application('catraca', '1.0.0');
 $application->add(new InitCommand());
 $application->add(new CheckCommand());
-$application->setDefaultCommand('check', true);
+$application->setDefaultCommand('check', false);
 $application->run();
