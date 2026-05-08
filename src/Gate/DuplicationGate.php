@@ -1,13 +1,13 @@
 <?php
 
-namespace B7S\RatchetBabysit\Gate;
+namespace B7S\Catraca\Gate;
 
-use B7S\RatchetBabysit\Baseline;
-use B7S\RatchetBabysit\Enum\ActionType;
-use B7S\RatchetBabysit\Enum\Severity;
-use B7S\RatchetBabysit\Enum\Status;
-use B7S\RatchetBabysit\GateResult;
-use B7S\RatchetBabysit\ToolResolver;
+use B7S\Catraca\Baseline;
+use B7S\Catraca\Enum\ActionType;
+use B7S\Catraca\Enum\Severity;
+use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateResult;
+use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
 class DuplicationGate
@@ -40,7 +40,7 @@ class DuplicationGate
 
     private function runJscpd(string $jscpd, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir() . '/ratchet-babysit-' . uniqid();
+        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
         @mkdir($tmpDir, 0755, true);
 
         $projectRoot = dirname($baseline->getPath());
@@ -70,7 +70,7 @@ class DuplicationGate
 
     private function runJscpdViaNpx(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir() . '/ratchet-babysit-' . uniqid();
+        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
         @mkdir($tmpDir, 0755, true);
 
         $projectRoot = dirname($baseline->getPath());

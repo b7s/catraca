@@ -1,11 +1,11 @@
 <?php
 
-namespace B7S\RatchetBabysit;
+namespace B7S\Catraca;
 
 class Baseline
 {
     private const FILENAME = 'baseline.json';
-    private const SCHEMA = 'ratchet-babysit/v1';
+    private const SCHEMA = 'catraca/v1';
 
     public function __construct(
         private readonly string $projectRoot,

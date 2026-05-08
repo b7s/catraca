@@ -1,8 +1,8 @@
 {
-    "name": "b7s/ratchet-babysit",
-    "description": "PHP Quality Guardian — enforces the Ratchet principle: quality metrics can only improve, never regress",
+    "name": "b7s/catraca",
+    "description": "PHP Quality Guardian — enforces the Catraca (ratchet) principle: quality metrics can only improve, never regress",
     "type": "library",
-    "keywords": ["quality", "ratchet", "babysit", "ci", "static-analysis", "coverage", "duplication", "grumphp"],
+    "keywords": ["quality", "catraca", "ratchet", "ci", "static-analysis", "coverage", "duplication", "grumphp"],
     "license": "MIT",
     "authors": [
         {
@@ -10,8 +10,8 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/b7s/ratchet-babysit-php/issues",
-        "source": "https://github.com/b7s/ratchet-babysit-php"
+        "issues": "https://github.com/b7s/catraca/issues",
+        "source": "https://github.com/b7s/catraca"
     },
     "require": {
         "php": "^8.2",
@@ -22,16 +22,16 @@
         "phpunit/phpunit": "^10.0 || ^11.0"
     },
     "bin": [
-        "bin/ratchet-babysit"
+        "bin/catraca"
     ],
     "autoload": {
         "psr-4": {
-            "B7S\\RatchetBabysit\\": "src/"
+            "B7S\\Catraca\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "B7S\\RatchetBabysit\\Tests\\": "tests/"
+            "B7S\\Catraca\\Tests\\": "tests/"
         }
     },
     "minimum-stability": "stable",

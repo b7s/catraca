@@ -1,8 +1,8 @@
 <?php
 
-namespace B7S\RatchetBabysit;
+namespace B7S\Catraca;
 
-use B7S\RatchetBabysit\Enum\Status;
+use B7S\Catraca\Enum\Status;
 
 class CheckResult
 {
@@ -72,7 +72,7 @@ class CheckResult
     public function toArray(): array
     {
         return [
-            'schema' => 'ratchet-babysit/v1',
+            'schema' => 'catraca/v1',
             'result' => $this->isPass() ? 'pass' : 'fail',
             'timestamp' => $this->timestamp->format(\DateTimeInterface::ATOM),
             'summary' => [

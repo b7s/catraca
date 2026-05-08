@@ -1,6 +1,6 @@
 <?php
 
-namespace B7S\RatchetBabysit\Enum;
+namespace B7S\Catraca\Enum;
 
 enum Status: string
 {

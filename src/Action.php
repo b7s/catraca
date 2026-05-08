@@ -1,9 +1,9 @@
 <?php
 
-namespace B7S\RatchetBabysit;
+namespace B7S\Catraca;
 
-use B7S\RatchetBabysit\Enum\ActionType;
-use B7S\RatchetBabysit\Enum\Status;
+use B7S\Catraca\Enum\ActionType;
+use B7S\Catraca\Enum\Status;
 
 readonly class Action
 {

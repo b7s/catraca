@@ -1,10 +1,10 @@
 <?php
 
-namespace B7S\RatchetBabysit\Output;
+namespace B7S\Catraca\Output;
 
-use B7S\RatchetBabysit\Action;
-use B7S\RatchetBabysit\CheckResult;
-use B7S\RatchetBabysit\Enum\Status;
+use B7S\Catraca\Action;
+use B7S\Catraca\CheckResult;
+use B7S\Catraca\Enum\Status;
 
 class HumanFormatter
 {
@@ -13,7 +13,7 @@ class HumanFormatter
         $lines = [];
 
         $lines[] = '';
-        $lines[] = $this->box('RATCHET BABYSIT — PHP Quality Gate Report');
+        $lines[] = $this->box('CATRACA — PHP Quality Gate Report');
         $lines[] = $this->divider();
 
         foreach ($result->getGates() as $gate) {
@@ -73,7 +73,7 @@ class HumanFormatter
         $lines = [];
 
         $lines[] = '';
-        $lines[] = 'RATCHET BABYSIT - PHP Quality Gate Report';
+        $lines[] = 'CATRACA - PHP Quality Gate Report';
         $lines[] = str_repeat('-', 50);
 
         foreach ($result->getGates() as $gate) {

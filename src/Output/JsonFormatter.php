@@ -1,8 +1,8 @@
 <?php
 
-namespace B7S\RatchetBabysit\Output;
+namespace B7S\Catraca\Output;
 
-use B7S\RatchetBabysit\CheckResult;
+use B7S\Catraca\CheckResult;
 
 class JsonFormatter
 {

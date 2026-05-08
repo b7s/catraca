@@ -1,16 +1,16 @@
 <?php
 
-namespace B7S\RatchetBabysit;
+namespace B7S\Catraca;
 
-use B7S\RatchetBabysit\Gate\ComplexityGate;
-use B7S\RatchetBabysit\Gate\CoverageGate;
-use B7S\RatchetBabysit\Gate\DuplicationGate;
-use B7S\RatchetBabysit\Gate\FileSizeGate;
-use B7S\RatchetBabysit\Gate\SecurityGate;
-use B7S\RatchetBabysit\Gate\StaticAnalysisGate;
-use B7S\RatchetBabysit\Gate\StyleGate;
+use B7S\Catraca\Gate\ComplexityGate;
+use B7S\Catraca\Gate\CoverageGate;
+use B7S\Catraca\Gate\DuplicationGate;
+use B7S\Catraca\Gate\FileSizeGate;
+use B7S\Catraca\Gate\SecurityGate;
+use B7S\Catraca\Gate\StaticAnalysisGate;
+use B7S\Catraca\Gate\StyleGate;
 
-class RatchetBabysit
+class Catraca
 {
     private Baseline $baseline;
     private ToolResolver $resolver;
@@ -48,7 +48,7 @@ class RatchetBabysit
                 $result->add($gateResult);
             } catch (\Throwable $e) {
                 $result->add(new GateResult(
-                    status: \B7S\RatchetBabysit\Enum\Status::Skip,
+                    status: \B7S\Catraca\Enum\Status::Skip,
                     name: 'unknown',
                     label: $gateDef['name'],
                     message: 'Error: ' . $e->getMessage(),
@@ -72,7 +72,7 @@ class RatchetBabysit
                 $result->add($gateResult);
             } catch (\Throwable $e) {
                 $result->add(new GateResult(
-                    status: \B7S\RatchetBabysit\Enum\Status::Skip,
+                    status: \B7S\Catraca\Enum\Status::Skip,
                     name: 'unknown',
                     label: $gateDef['name'],
                     message: 'Error: ' . $e->getMessage(),

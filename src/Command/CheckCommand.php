@@ -1,11 +1,11 @@
 <?php
 
-namespace B7S\RatchetBabysit\Command;
+namespace B7S\Catraca\Command;
 
-use B7S\RatchetBabysit\Output\GithubFormatter;
-use B7S\RatchetBabysit\Output\HumanFormatter;
-use B7S\RatchetBabysit\Output\JsonFormatter;
-use B7S\RatchetBabysit\RatchetBabysit;
+use B7S\Catraca\Output\GithubFormatter;
+use B7S\Catraca\Output\HumanFormatter;
+use B7S\Catraca\Output\JsonFormatter;
+use B7S\Catraca\Catraca;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -37,8 +37,8 @@ class CheckCommand extends Command
         $format = $input->getOption('format');
         $noAnsi = $input->getOption('plain') || !$output->isDecorated();
 
-        $babysit = new RatchetBabysit($projectRoot);
-        $result = $babysit->check();
+        $catraca = new Catraca($projectRoot);
+        $result = $catraca->check();
 
         $formatted = match ($format) {
             'json' => (new JsonFormatter())->format($result),

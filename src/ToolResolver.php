@@ -1,6 +1,6 @@
 <?php
 
-namespace B7S\RatchetBabysit;
+namespace B7S\Catraca;
 
 class ToolResolver
 {

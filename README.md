@@ -1,11 +1,13 @@
-# Ratchet Babysit PHP
+# Catraca
 
-Composer package that enforces the **Ratchet (catraca) principle** on PHP projects: quality metrics can only improve or stay the same, never regress.
+PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality metrics can only improve or stay the same, never regress.
+
+> **Catraca** (Portuguese for "turnstile" / "ratchet") — like a turnstile at a subway station, quality can only move forward.
 
 ## Install
 
 ```bash
-composer require --dev b7s/ratchet-babysit
+composer require --dev b7s/catraca
 ```
 
 ## Usage
@@ -14,19 +16,22 @@ composer require --dev b7s/ratchet-babysit
 
 ```bash
 # Initialize baseline (first run)
-vendor/bin/ratchet-babysit init
+vendor/bin/catraca init
 
 # Run quality gates
-vendor/bin/ratchet-babysit check
+vendor/bin/catraca check
 
 # JSON output for AI / CI
-vendor/bin/ratchet-babysit check --format=json
+vendor/bin/catraca check --format=json
 
 # GitHub Actions annotations
-vendor/bin/ratchet-babysit check --format=github
+vendor/bin/catraca check --format=github
+
+# Plain text (no ANSI colors)
+vendor/bin/catraca check --plain
 
 # Specify project path
-vendor/bin/ratchet-babysit check --path=/path/to/project
+vendor/bin/catraca check --path=/path/to/project
 ```
 
 ### Exit Codes
@@ -44,7 +49,7 @@ Terminal-friendly output with ANSI colors:
 
 ```
   ┌──────────────────────────────────────────────────┐
-  │ RATCHET BABYSIT — PHP Quality Gate Report        │
+  │ CATRACA — PHP Quality Gate Report                │
   └──────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────
   ✔ Security Audit          PASS     0 total advisories, 0 critical/high
@@ -64,7 +69,7 @@ Terminal-friendly output with ANSI colors:
       → app/Service.php:42
       → app/Repository.php:15
       → app/Controller.php:88
-  [2] REFACTOR DUP — Duplication increased from 3.00% to 5.20% — refactor duplicated code
+  [2] REFACTOR DUP — Duplication increased from 3.00% to 5.20%
       → src/A.php:10-50 <-> src/B.php:100-140 (40L)
 ```
 
@@ -72,7 +77,7 @@ Terminal-friendly output with ANSI colors:
 
 ```json
 {
-  "schema": "ratchet-babysit/v1",
+  "schema": "catraca/v1",
   "result": "fail",
   "timestamp": "2025-05-08T10:30:00+00:00",
   "summary": {
@@ -109,7 +114,7 @@ Uses `::error::`, `::warning::`, and `::group::` annotations for native GitHub i
 
 ```yaml
 - name: Run quality gates
-  run: vendor/bin/ratchet-babysit check --format=github --no-ansi
+  run: vendor/bin/catraca check --format=github --plain
 ```
 
 ## Quality Gates
@@ -133,33 +138,22 @@ If a tool is not installed, the gate is **skipped** (not failed).
 `baseline.json` stores the current quality metrics. On first run, use `init` to create it:
 
 ```bash
-vendor/bin/ratchet-babysit init
+vendor/bin/catraca init
 ```
 
 The `check` command compares current metrics against the baseline. Coverage must not decrease, duplication must not increase, etc.
 
 ## GrumPHP Integration
 
-Add to your `grumphp.yml`:
-
-```yaml
-grumphp:
-  tasks:
-    ratchet_babysit:
-      format: human
-```
-
-Or use as a custom task via Process:
-
 ```php
 use GrumPHP\Runner\TaskResult;
 use GrumPHP\Task\AbstractExternalTask;
 
-class RatchetBabysitTask extends AbstractExternalTask
+class CatracaTask extends AbstractExternalTask
 {
     public function run(): TaskResult
     {
-        $process = $this->processBuilder->build(['vendor/bin/ratchet-babysit', 'check', '--format=json']);
+        $process = $this->processBuilder->build(['vendor/bin/catraca', 'check', '--format=json']);
         $process->run();
 
         if (!$process->isSuccessful()) {
@@ -173,17 +167,41 @@ class RatchetBabysitTask extends AbstractExternalTask
 
 ## GitHub Actions
 
-See `.github/workflows/check.yml` for a complete example.
+```yaml
+name: Catraca Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: pcov
+          tools: composer, phpstan, pint, phpmetrics
+
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer require --dev b7s/catraca
+      - run: vendor/bin/catraca init --plain
+        continue-on-error: true
+      - run: vendor/bin/catraca check --format=github --plain
+```
 
 ## Programmatic Usage
 
 ```php
-use B7S\RatchetBabysit\RatchetBabysit;
-use B7S\RatchetBabysit\Output\JsonFormatter;
-use B7S\RatchetBabysit\Output\HumanFormatter;
+use B7S\Catraca\Catraca;
+use B7S\Catraca\Output\JsonFormatter;
+use B7S\Catraca\Output\HumanFormatter;
 
-$babysit = new RatchetBabysit('/path/to/project');
-$result = $babysit->check();
+$catraca = new Catraca('/path/to/project');
+$result = $catraca->check();
 
 if ($result->isPass()) {
     echo "All quality gates passed!\n";
@@ -193,7 +211,7 @@ if ($result->isPass()) {
     }
 }
 
-// Get structured data
+// Get structured JSON for AI agents
 echo json_encode($result->toArray(), JSON_PRETTY_PRINT);
 ```
 

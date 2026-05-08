@@ -1,9 +1,9 @@
 <?php
 
-namespace B7S\RatchetBabysit\Output;
+namespace B7S\Catraca\Output;
 
-use B7S\RatchetBabysit\CheckResult;
-use B7S\RatchetBabysit\Enum\Status;
+use B7S\Catraca\CheckResult;
+use B7S\Catraca\Enum\Status;
 
 class GithubFormatter
 {
@@ -11,7 +11,7 @@ class GithubFormatter
     {
         $lines = [];
 
-        $lines[] = '::group::Ratchet Babysit — Quality Gate Report';
+        $lines[] = '::group::Catraca — Quality Gate Report';
 
         foreach ($result->getGates() as $gate) {
             $icon = match ($gate->status) {
@@ -61,7 +61,7 @@ class GithubFormatter
         $lines[] = '::endgroup::';
 
         if (!$result->isPass()) {
-            $lines[] = sprintf('::error::Ratchet Babysit: %d quality gate(s) failed', $result->getFailedCount());
+            $lines[] = sprintf('::error::Catraca: %d quality gate(s) failed', $result->getFailedCount());
         }
 
         return implode("\n", $lines) . "\n";
