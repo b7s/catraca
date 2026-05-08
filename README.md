@@ -1,3 +1,7 @@
+<div align="center">
+    <img src="logo.webp" width="256" alt="Catraca Logo">
+</div>
+
 # Catraca
 
 PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality metrics can only improve or stay the same, never regress.
