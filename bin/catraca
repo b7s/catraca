@@ -8,7 +8,9 @@ use Symfony\Component\Console\Application;
 require __DIR__ . '/../vendor/autoload.php';
 
 $application = new Application('catraca', '1.0.0');
-$application->add(new InitCommand());
-$application->add(new CheckCommand());
+$application->addCommands([
+    new InitCommand(),
+    new CheckCommand(),
+]);
 $application->setDefaultCommand('check', false);
 $application->run();
