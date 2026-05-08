@@ -11,9 +11,9 @@ class ToolResolver
     public function resolve(string $tool): ?string
     {
         $candidates = [
-            $this->projectRoot . '/vendor/bin/' . $tool,
+            $this->projectRoot.'/vendor/bin/'.$tool,
             $tool,
-            $this->getComposerGlobalBin() . '/' . $tool,
+            $this->getComposerGlobalBin().'/'.$tool,
         ];
 
         foreach ($candidates as $candidate) {
@@ -33,13 +33,14 @@ class ToolResolver
                 sprintf('Tool "%s" not found. Install it locally (composer require --dev), globally (composer global require), or as a standalone PHAR.', $tool)
             );
         }
+
         return $resolved;
     }
 
     public function resolvePhp(): string
     {
         $candidates = [
-            $this->projectRoot . '/vendor/bin/php',
+            $this->projectRoot.'/vendor/bin/php',
             PHP_BINARY,
             'php',
         ];
@@ -57,14 +58,14 @@ class ToolResolver
     {
         $home = getenv('COMPOSER_HOME');
         if (is_string($home) && $home !== '') {
-            return $home . '/vendor/bin';
+            return $home.'/vendor/bin';
         }
 
         $fallback = (PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux')
             ? ($_SERVER['HOME'] ?? '~/')
             : (getenv('APPDATA') ?: '~/');
 
-        return (is_string($fallback) ? $fallback : '~/') . '/vendor/bin';
+        return (is_string($fallback) ? $fallback : '~/').'/vendor/bin';
     }
 
     private function isExecutable(string $path): bool
@@ -79,12 +80,12 @@ class ToolResolver
     private function isInPath(string $command): bool
     {
         $path = getenv('PATH');
-        if (!is_string($path) || $path === '') {
+        if (! is_string($path) || $path === '') {
             return false;
         }
 
         foreach (explode(PATH_SEPARATOR, $path) as $dir) {
-            $fullPath = $dir . DIRECTORY_SEPARATOR . $command;
+            $fullPath = $dir.DIRECTORY_SEPARATOR.$command;
             if (file_exists($fullPath) && is_executable($fullPath)) {
                 return true;
             }

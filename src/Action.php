@@ -7,7 +7,7 @@ use B7S\Catraca\Enum\ActionType;
 readonly class Action
 {
     /**
-     * @param string[] $files
+     * @param  string[]  $files
      */
     public function __construct(
         public ActionType $type,

@@ -2,6 +2,7 @@
 
 namespace B7S\Catraca;
 
+use B7S\Catraca\Enum\Status;
 use B7S\Catraca\Gate\ComplexityGate;
 use B7S\Catraca\Gate\CoverageGate;
 use B7S\Catraca\Gate\DuplicationGate;
@@ -13,6 +14,7 @@ use B7S\Catraca\Gate\StyleGate;
 class Catraca
 {
     private Baseline $baseline;
+
     private ToolResolver $resolver;
 
     /** @var array<int, array{gate: GateInterface, name: string}> */
@@ -24,21 +26,21 @@ class Catraca
         $this->resolver = new ToolResolver($projectRoot);
 
         $this->gates = [
-            ['gate' => new SecurityGate(), 'name' => 'Security Audit'],
-            ['gate' => new StyleGate(), 'name' => 'Code Style'],
-            ['gate' => new StaticAnalysisGate(), 'name' => 'Static Analysis'],
-            ['gate' => new CoverageGate(), 'name' => 'Test Coverage'],
-            ['gate' => new DuplicationGate(), 'name' => 'Duplication'],
-            ['gate' => new FileSizeGate(), 'name' => 'File Size'],
-            ['gate' => new ComplexityGate(), 'name' => 'Cyclomatic Complexity'],
+            ['gate' => new SecurityGate, 'name' => 'Security Audit'],
+            ['gate' => new StyleGate, 'name' => 'Code Style'],
+            ['gate' => new StaticAnalysisGate, 'name' => 'Static Analysis'],
+            ['gate' => new CoverageGate, 'name' => 'Test Coverage'],
+            ['gate' => new DuplicationGate, 'name' => 'Duplication'],
+            ['gate' => new FileSizeGate, 'name' => 'File Size'],
+            ['gate' => new ComplexityGate, 'name' => 'Cyclomatic Complexity'],
         ];
     }
 
     public function init(): CheckResult
     {
-        $result = new CheckResult();
+        $result = new CheckResult;
 
-        if (!$this->baseline->exists()) {
+        if (! $this->baseline->exists()) {
             $this->baseline->init();
         }
 
@@ -48,10 +50,10 @@ class Catraca
                 $result->add($gateResult);
             } catch (\Throwable $e) {
                 $result->add(new GateResult(
-                    status: \B7S\Catraca\Enum\Status::Skip,
+                    status: Status::Skip,
                     name: 'unknown',
                     label: $gateDef['name'],
-                    message: 'Error: ' . $e->getMessage(),
+                    message: 'Error: '.$e->getMessage(),
                     details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
                 ));
             }
@@ -64,11 +66,11 @@ class Catraca
 
     public function check(): CheckResult
     {
-        if (!$this->baseline->exists()) {
+        if (! $this->baseline->exists()) {
             $this->baseline->init();
         }
 
-        $result = new CheckResult();
+        $result = new CheckResult;
 
         foreach ($this->gates as $gateDef) {
             try {
@@ -76,10 +78,10 @@ class Catraca
                 $result->add($gateResult);
             } catch (\Throwable $e) {
                 $result->add(new GateResult(
-                    status: \B7S\Catraca\Enum\Status::Skip,
+                    status: Status::Skip,
                     name: 'unknown',
                     label: $gateDef['name'],
-                    message: 'Error: ' . $e->getMessage(),
+                    message: 'Error: '.$e->getMessage(),
                     details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
                 ));
             }

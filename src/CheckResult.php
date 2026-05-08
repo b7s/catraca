@@ -10,7 +10,7 @@ class CheckResult
     private array $gates = [];
 
     public function __construct(
-        public readonly \DateTimeImmutable $timestamp = new \DateTimeImmutable(),
+        public readonly \DateTimeImmutable $timestamp = new \DateTimeImmutable,
     ) {}
 
     public function add(GateResult $gate): void
@@ -31,6 +31,7 @@ class CheckResult
                 return false;
             }
         }
+
         return true;
     }
 
@@ -51,22 +52,23 @@ class CheckResult
                 );
             }
         }
+
         return $actions;
     }
 
     public function getPassedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->isPass()));
+        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->isPass()));
     }
 
     public function getFailedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->isFail()));
+        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->isFail()));
     }
 
     public function getSkippedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->status === Status::Skip));
+        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->status === Status::Skip));
     }
 
     /**
@@ -84,8 +86,8 @@ class CheckResult
                 'failed' => $this->getFailedCount(),
                 'skipped' => $this->getSkippedCount(),
             ],
-            'gates' => array_map(fn(GateResult $g): array => $g->toArray(), $this->gates),
-            'actions' => array_map(fn(Action $a): array => $a->toArray(), $this->getActions()),
+            'gates' => array_map(fn (GateResult $g): array => $g->toArray(), $this->gates),
+            'actions' => array_map(fn (Action $a): array => $a->toArray(), $this->getActions()),
         ];
     }
 }

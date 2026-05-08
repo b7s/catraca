@@ -9,6 +9,7 @@ class JsonFormatter
     public function format(CheckResult $result): string
     {
         $encoded = json_encode($result->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        return ($encoded !== false ? $encoded : '{}') . "\n";
+
+        return ($encoded !== false ? $encoded : '{}')."\n";
     }
 }

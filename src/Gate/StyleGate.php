@@ -52,12 +52,12 @@ class StyleGate implements GateInterface
                 if (is_array($errors)) {
                     $violations = count($errors);
                     foreach ($errors as $error) {
-                        if (!is_array($error)) {
+                        if (! is_array($error)) {
                             continue;
                         }
                         $fileName = is_string($error['file'] ?? null) ? $error['file'] : (is_string($error['path'] ?? null) ? $error['path'] : 'unknown');
                         $line = is_int($error['line'] ?? null) ? $error['line'] : 0;
-                        $files[] = $fileName . ':' . $line;
+                        $files[] = $fileName.':'.$line;
                     }
                 }
             }
@@ -65,10 +65,10 @@ class StyleGate implements GateInterface
 
         if ($violations === 0 && $exitCode !== 0) {
             $lines = array_filter(explode("\n", $output));
-            $dirtyFiles = array_filter($lines, fn(string $l): bool => preg_match('/\.(php|blade\.php)$/', $l) && !str_contains($l, ' '));
+            $dirtyFiles = array_filter($lines, fn (string $l): bool => preg_match('/\.(php|blade\.php)$/', $l) && ! str_contains($l, ' '));
             if (count($dirtyFiles) > 0) {
                 $violations = count($dirtyFiles);
-                $files = array_values(array_map(fn(string $f): string => trim($f), $dirtyFiles));
+                $files = array_values(array_map(fn (string $f): string => trim($f), $dirtyFiles));
             } else {
                 $violations = 1;
                 $files[] = 'Run `pint --test` for details';

@@ -36,14 +36,14 @@ class CoverageGate implements GateInterface
 
     private function runPhpunit(string $phpunit, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
         @mkdir($tmpDir, 0755, true);
 
-        $cloverPath = $tmpDir . '/clover.xml';
+        $cloverPath = $tmpDir.'/clover.xml';
 
         $process = new Process([
             $resolver->resolvePhp(), $phpunit,
-            '--coverage-clover=' . $cloverPath,
+            '--coverage-clover='.$cloverPath,
             '--coverage-text',
         ]);
         $process->run();
@@ -127,12 +127,13 @@ class CoverageGate implements GateInterface
     private function getBaselineCoverage(Baseline $baseline): float
     {
         $val = $baseline->get('coverage', 'percentage', 85.0);
+
         return is_numeric($val) ? (float) $val : 85.0;
     }
 
     private function parseClover(string $path): ?float
     {
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return null;
         }
 
@@ -164,15 +165,16 @@ class CoverageGate implements GateInterface
         if (preg_match('/(\d+\.?\d*)\s*%\s*(covered|coverage)/i', $output, $m)) {
             return (float) $m[1];
         }
+
         return null;
     }
 
     private function cleanup(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
-        $files = glob($dir . '/*');
+        $files = glob($dir.'/*');
         if ($files !== false) {
             foreach ($files as $file) {
                 @unlink($file);

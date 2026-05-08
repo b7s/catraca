@@ -42,7 +42,7 @@ class StaticAnalysisGate implements GateInterface
             '--error-format=json', '--no-progress',
         ];
 
-        if (!$this->hasPhpstanConfig($baseline->projectRoot)) {
+        if (! $this->hasPhpstanConfig($baseline->projectRoot)) {
             $args[] = '--level=5';
         }
 
@@ -72,15 +72,15 @@ class StaticAnalysisGate implements GateInterface
             $rawFiles = $data['files'] ?? [];
             if (is_array($rawFiles)) {
                 foreach ($rawFiles as $filePath => $fileData) {
-                    if (!is_string($filePath) || !is_array($fileData)) {
+                    if (! is_string($filePath) || ! is_array($fileData)) {
                         continue;
                     }
                     $messages = $fileData['messages'] ?? [];
-                    if (!is_array($messages)) {
+                    if (! is_array($messages)) {
                         continue;
                     }
                     foreach ($messages as $msg) {
-                        if (!is_array($msg)) {
+                        if (! is_array($msg)) {
                             continue;
                         }
                         $errors[] = [
@@ -89,7 +89,7 @@ class StaticAnalysisGate implements GateInterface
                             'message' => is_string($msg['message'] ?? null) ? $msg['message'] : '',
                             'ignorable' => ($msg['ignorable'] ?? true) === true,
                         ];
-                        $files[] = $filePath . ':' . (is_int($msg['line'] ?? null) ? $msg['line'] : 0);
+                        $files[] = $filePath.':'.(is_int($msg['line'] ?? null) ? $msg['line'] : 0);
                     }
                 }
             }
@@ -143,7 +143,7 @@ class StaticAnalysisGate implements GateInterface
 
         if (is_array($data)) {
             foreach ($data as $issue) {
-                if (!is_array($issue)) {
+                if (! is_array($issue)) {
                     continue;
                 }
                 $filePath = $issue['file_path'] ?? null;
@@ -155,7 +155,7 @@ class StaticAnalysisGate implements GateInterface
                         'message' => is_string($issue['message'] ?? null) ? $issue['message'] : '',
                         'severity' => is_string($issue['severity'] ?? null) ? $issue['severity'] : 'error',
                     ];
-                    $files[] = $filePath . ':' . $line;
+                    $files[] = $filePath.':'.$line;
                 }
             }
         }
@@ -193,10 +193,11 @@ class StaticAnalysisGate implements GateInterface
     private function hasPhpstanConfig(string $projectRoot): bool
     {
         foreach (['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'] as $file) {
-            if (file_exists($projectRoot . '/' . $file)) {
+            if (file_exists($projectRoot.'/'.$file)) {
                 return true;
             }
         }
+
         return false;
     }
 }

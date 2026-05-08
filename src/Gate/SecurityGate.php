@@ -23,7 +23,7 @@ class SecurityGate implements GateInterface
 
         $output = $process->getOutput();
         $data = json_decode($output, true);
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             return new GateResult(
                 status: Status::Skip,
                 name: 'security',
@@ -37,10 +37,11 @@ class SecurityGate implements GateInterface
         $advisories = is_array($rawAdvisories) ? $rawAdvisories : [];
 
         $critical = array_filter($advisories, function (mixed $a): bool {
-            if (!is_array($a)) {
+            if (! is_array($a)) {
                 return false;
             }
             $severity = $a['severity'] ?? '';
+
             return is_string($severity) && in_array($severity, ['critical', 'high'], true);
         });
 
@@ -59,14 +60,14 @@ class SecurityGate implements GateInterface
             /** @var array<int, array<string, mixed>> $detailList */
             $detailList = [];
             foreach ($critical as $a) {
-                if (!is_array($a)) {
+                if (! is_array($a)) {
                     continue;
                 }
                 $title = is_string($a['title'] ?? null) ? $a['title'] : 'unknown';
                 $cve = is_string($a['cve'] ?? null) ? $a['cve'] : 'N/A';
                 $link = is_string($a['link'] ?? null) ? $a['link'] : 'N/A';
                 $cveOrLink = is_string($a['cve'] ?? null) ? $a['cve'] : (is_string($a['link'] ?? null) ? $a['link'] : 'N/A');
-                $files[] = $title . ' (' . $cveOrLink . ')';
+                $files[] = $title.' ('.$cveOrLink.')';
                 $detailList[] = [
                     'package' => is_string($a['package'] ?? null) ? $a['package'] : 'unknown',
                     'severity' => is_string($a['severity'] ?? null) ? $a['severity'] : 'unknown',

@@ -41,7 +41,7 @@ class DuplicationGate implements GateInterface
 
     private function runJscpd(string $jscpd, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
         @mkdir($tmpDir, 0755, true);
 
         $process = new Process([
@@ -50,12 +50,12 @@ class DuplicationGate implements GateInterface
             '--reporters', 'json',
             '--output', $tmpDir,
             '--ignore', '**/vendor/**,**/node_modules/**',
-            $baseline->projectRoot . '/src',
-            $baseline->projectRoot . '/app',
+            $baseline->projectRoot.'/src',
+            $baseline->projectRoot.'/app',
         ]);
         $process->run();
 
-        $data = $this->readJsonFile($tmpDir . '/jscpd-report.json');
+        $data = $this->readJsonFile($tmpDir.'/jscpd-report.json');
         $this->cleanup($tmpDir);
 
         return $this->parseJscpdResult($data, $baseline);
@@ -63,7 +63,7 @@ class DuplicationGate implements GateInterface
 
     private function runJscpdViaNpx(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
         @mkdir($tmpDir, 0755, true);
 
         $process = new Process([
@@ -72,19 +72,19 @@ class DuplicationGate implements GateInterface
             '--reporters', 'json',
             '--output', $tmpDir,
             '--ignore', '**/vendor/**,**/node_modules/**',
-            $baseline->projectRoot . '/src',
-            $baseline->projectRoot . '/app',
+            $baseline->projectRoot.'/src',
+            $baseline->projectRoot.'/app',
         ]);
         $process->run();
 
-        $data = $this->readJsonFile($tmpDir . '/jscpd-report.json');
+        $data = $this->readJsonFile($tmpDir.'/jscpd-report.json');
         $this->cleanup($tmpDir);
 
         return $this->parseJscpdResult($data, $baseline);
     }
 
     /**
-     * @param array<string, mixed>|null $data
+     * @param  array<string, mixed>|null  $data
      */
     private function parseJscpdResult(?array $data, Baseline $baseline): GateResult
     {
@@ -106,7 +106,7 @@ class DuplicationGate implements GateInterface
             $duplicates = $data['duplicates'] ?? ($statistics['duplicates'] ?? []);
             if (is_array($duplicates)) {
                 foreach ($duplicates as $dup) {
-                    if (!is_array($dup)) {
+                    if (! is_array($dup)) {
                         continue;
                     }
                     $first = is_array($dup['firstFile'] ?? null) ? $dup['firstFile'] : [];
@@ -121,8 +121,8 @@ class DuplicationGate implements GateInterface
                     $secondEnd = is_int($second['end'] ?? null) ? $second['end'] : 0;
 
                     $cloneDetails[] = [
-                        'file_a' => $firstName . ':' . $firstStart . '-' . $firstEnd,
-                        'file_b' => $secondName . ':' . $secondStart . '-' . $secondEnd,
+                        'file_a' => $firstName.':'.$firstStart.'-'.$firstEnd,
+                        'file_b' => $secondName.':'.$secondStart.'-'.$secondEnd,
                         'lines' => $lines,
                     ];
                     $clones[] = sprintf(
@@ -166,8 +166,8 @@ class DuplicationGate implements GateInterface
     {
         $process = new Process([
             $resolver->resolvePhp(), $phpcpd,
-            $baseline->projectRoot . '/src',
-            $baseline->projectRoot . '/app',
+            $baseline->projectRoot.'/src',
+            $baseline->projectRoot.'/app',
         ]);
         $process->run();
 
@@ -215,6 +215,7 @@ class DuplicationGate implements GateInterface
     private function getBaselineDup(Baseline $baseline): float
     {
         $val = $baseline->get('duplication', 'percentage', 2.0);
+
         return is_numeric($val) ? (float) $val : 2.0;
     }
 
@@ -223,7 +224,7 @@ class DuplicationGate implements GateInterface
      */
     private function readJsonFile(string $path): ?array
     {
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return null;
         }
         $content = file_get_contents($path);
@@ -231,7 +232,7 @@ class DuplicationGate implements GateInterface
             return null;
         }
         $data = json_decode($content, true);
-        if (!is_array($data)) {
+        if (! is_array($data)) {
             return null;
         }
         $result = [];
@@ -240,12 +241,13 @@ class DuplicationGate implements GateInterface
                 $result[$key] = $value;
             }
         }
+
         return $result;
     }
 
     private function cleanup(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
         $items = new \RecursiveIteratorIterator(
@@ -253,7 +255,7 @@ class DuplicationGate implements GateInterface
             \RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($items as $item) {
-            if (!($item instanceof \SplFileInfo)) {
+            if (! ($item instanceof \SplFileInfo)) {
                 continue;
             }
             if ($item->isDir()) {

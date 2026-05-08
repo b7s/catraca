@@ -5,7 +5,9 @@ namespace B7S\Catraca;
 class Baseline
 {
     private const FILENAME = 'baseline.json';
+
     private const SCHEMA = 'catraca/v1';
+
     public readonly string $projectRoot;
 
     public function __construct(string $projectRoot)
@@ -15,7 +17,7 @@ class Baseline
 
     public function getPath(): string
     {
-        return $this->projectRoot . '/' . self::FILENAME;
+        return $this->projectRoot.'/'.self::FILENAME;
     }
 
     public function exists(): bool
@@ -28,7 +30,7 @@ class Baseline
      */
     public function read(): ?array
     {
-        if (!$this->exists()) {
+        if (! $this->exists()) {
             return null;
         }
 
@@ -38,7 +40,7 @@ class Baseline
         }
 
         $data = json_decode($content, true);
-        if (!is_array($data) || $data === []) {
+        if (! is_array($data) || $data === []) {
             return null;
         }
 
@@ -46,25 +48,25 @@ class Baseline
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function write(array $data): void
     {
         $data['schema'] = self::SCHEMA;
-        $data['updated_at'] = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        $data['updated_at'] = (new \DateTimeImmutable)->format(\DateTimeInterface::ATOM);
 
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             return;
         }
-        file_put_contents($this->getPath(), $json . "\n");
+        file_put_contents($this->getPath(), $json."\n");
     }
 
     public function init(): void
     {
         $this->write([
             'schema' => self::SCHEMA,
-            'created_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+            'created_at' => (new \DateTimeImmutable)->format(\DateTimeInterface::ATOM),
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
@@ -82,7 +84,7 @@ class Baseline
             return $default;
         }
 
-        if (!is_array($data[$gate] ?? null)) {
+        if (! is_array($data[$gate] ?? null)) {
             return $default;
         }
 
@@ -90,7 +92,7 @@ class Baseline
     }
 
     /**
-     * @param array<mixed, mixed> $data
+     * @param  array<mixed, mixed>  $data
      * @return array<string, mixed>
      */
     private function normalizeArray(array $data): array
@@ -101,6 +103,7 @@ class Baseline
                 $result[$key] = $value;
             }
         }
+
         return $result;
     }
 }

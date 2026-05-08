@@ -9,10 +9,10 @@ use B7S\Catraca\Enum\Status;
 readonly class GateResult
 {
     /**
-     * @param array<mixed, mixed>|null $baseline
-     * @param array<mixed, mixed>|null $current
-     * @param array<array{type: ActionType, message: string, files?: array<int, string>}>|null $actions
-     * @param array<mixed, mixed>|null $details
+     * @param  array<mixed, mixed>|null  $baseline
+     * @param  array<mixed, mixed>|null  $current
+     * @param  array<array{type: ActionType, message: string, files?: array<int, string>}>|null  $actions
+     * @param  array<mixed, mixed>|null  $details
      */
     public function __construct(
         public Status $status,
@@ -56,7 +56,7 @@ readonly class GateResult
             $result['current'] = $this->current;
         }
         if ($this->actions !== null) {
-            $result['actions'] = array_map(fn(array $a): array => [
+            $result['actions'] = array_map(fn (array $a): array => [
                 'type' => $a['type']->value,
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],

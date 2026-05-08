@@ -57,7 +57,7 @@ class HumanFormatter
             $lines[] = '';
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 
     public function formatPlain(CheckResult $result): string
@@ -100,7 +100,7 @@ class HumanFormatter
             $lines[] = '';
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 
     private function icon(GateResult $gate): string
@@ -114,7 +114,7 @@ class HumanFormatter
     }
 
     /**
-     * @param array<int, string> $lines
+     * @param  array<int, string>  $lines
      */
     private function formatFiles(array &$lines, Action $action): void
     {
@@ -129,11 +129,12 @@ class HumanFormatter
     private function box(string $text): string
     {
         $len = mb_strlen($text);
+
         return sprintf("  ┌%s┐\n  │ %s │\n  └%s┘", str_repeat('─', $len + 2), $text, str_repeat('─', $len + 2));
     }
 
     private function divider(): string
     {
-        return '  ' . str_repeat('─', 60);
+        return '  '.str_repeat('─', 60);
     }
 }

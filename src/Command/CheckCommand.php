@@ -2,10 +2,10 @@
 
 namespace B7S\Catraca\Command;
 
+use B7S\Catraca\Catraca;
 use B7S\Catraca\Output\GithubFormatter;
 use B7S\Catraca\Output\HumanFormatter;
 use B7S\Catraca\Output\JsonFormatter;
-use B7S\Catraca\Catraca;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -31,25 +31,26 @@ class CheckCommand extends Command
         $pathOption = $input->getOption('path');
         $rawPath = is_string($pathOption) ? $pathOption : (string) getcwd();
         $projectRoot = realpath($rawPath);
-        if ($projectRoot === false || !is_dir($projectRoot)) {
+        if ($projectRoot === false || ! is_dir($projectRoot)) {
             $output->writeln(sprintf('<error>Directory not found: %s</error>', $rawPath));
+
             return Command::FAILURE;
         }
 
         /** @var string $format */
         $format = $input->getOption('format');
-        $noAnsi = $input->getOption('plain') || !$output->isDecorated();
+        $noAnsi = $input->getOption('plain') || ! $output->isDecorated();
 
         $catraca = new Catraca($projectRoot);
         $result = $catraca->check();
 
         $formatted = match ($format) {
-            'json' => (new JsonFormatter())->format($result),
-            'github' => (new GithubFormatter())->format($result),
+            'json' => (new JsonFormatter)->format($result),
+            'github' => (new GithubFormatter)->format($result),
             'human' => $noAnsi
-                ? (new HumanFormatter())->formatPlain($result)
-                : (new HumanFormatter())->format($result),
-            default => (new HumanFormatter())->format($result),
+                ? (new HumanFormatter)->formatPlain($result)
+                : (new HumanFormatter)->format($result),
+            default => (new HumanFormatter)->format($result),
         };
 
         $output->write($formatted);

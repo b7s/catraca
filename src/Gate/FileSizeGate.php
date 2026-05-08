@@ -16,16 +16,16 @@ class FileSizeGate implements GateInterface
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $maxLines = $baseline->get('file_size', 'max_lines', 1000);
-        if (!is_int($maxLines) || $maxLines <= 0) {
+        if (! is_int($maxLines) || $maxLines <= 0) {
             $maxLines = 1000;
         }
 
         /** @var array<int, array{file: string, lines: int, limit: int, excess: int}> $oversized */
         $oversized = [];
-        $dirs = [$baseline->projectRoot . '/src', $baseline->projectRoot . '/app', $baseline->projectRoot . '/lib'];
+        $dirs = [$baseline->projectRoot.'/src', $baseline->projectRoot.'/app', $baseline->projectRoot.'/lib'];
 
         foreach ($dirs as $dir) {
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 continue;
             }
             $this->scanDirectory($dir, $maxLines, $oversized, $baseline->projectRoot);
@@ -39,7 +39,7 @@ class FileSizeGate implements GateInterface
             $actions = [[
                 'type' => ActionType::Modularize,
                 'message' => sprintf('%d files exceed %d lines — split into smaller modules', count($oversized), $maxLines),
-                'files' => array_map(fn(array $f): string => $f['file'] . ' (' . $f['lines'] . 'L)', $oversized),
+                'files' => array_map(fn (array $f): string => $f['file'].' ('.$f['lines'].'L)', $oversized),
             ]];
         }
 
@@ -57,7 +57,7 @@ class FileSizeGate implements GateInterface
     }
 
     /**
-     * @param array<int, array{file: string, lines: int, limit: int, excess: int}> $oversized
+     * @param  array<int, array{file: string, lines: int, limit: int, excess: int}>  $oversized
      */
     private function scanDirectory(string $dir, int $maxLines, array &$oversized, string $root): void
     {
@@ -66,7 +66,7 @@ class FileSizeGate implements GateInterface
         );
 
         foreach ($iterator as $file) {
-            if (!($file instanceof SplFileInfo) || !$file->isFile() || $file->getExtension() !== 'php') {
+            if (! ($file instanceof SplFileInfo) || ! $file->isFile() || $file->getExtension() !== 'php') {
                 continue;
             }
 
@@ -82,7 +82,7 @@ class FileSizeGate implements GateInterface
 
             if ($lineCount > $maxLines) {
                 $oversized[] = [
-                    'file' => str_replace($root . '/', '', $file->getPathname()),
+                    'file' => str_replace($root.'/', '', $file->getPathname()),
                     'lines' => $lineCount,
                     'limit' => $maxLines,
                     'excess' => $lineCount - $maxLines,

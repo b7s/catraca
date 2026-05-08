@@ -55,24 +55,24 @@ class GithubFormatter
 
         $lines[] = '::endgroup::';
 
-        if (!$result->isPass()) {
+        if (! $result->isPass()) {
             $lines[] = sprintf('::error::Catraca: %d quality gate(s) failed', $result->getFailedCount());
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 
     /**
-     * @param array<int, string> $lines
+     * @param  array<int, string>  $lines
      */
     private function annotateDetails(array &$lines, GateResult $gate, string $annotationLevel): void
     {
         $errors = $gate->details['errors'] ?? $gate->details['clones'] ?? $gate->details['oversized'] ?? [];
-        if (!is_array($errors)) {
+        if (! is_array($errors)) {
             return;
         }
         foreach (array_slice($errors, 0, 10) as $detail) {
-            if (!is_array($detail)) {
+            if (! is_array($detail)) {
                 continue;
             }
             $file = $detail['file'] ?? null;
