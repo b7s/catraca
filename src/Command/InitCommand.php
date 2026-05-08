@@ -28,12 +28,15 @@ class InitCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $projectRoot = realpath($input->getOption('path'));
+        $pathOption = $input->getOption('path');
+        $rawPath = is_string($pathOption) ? $pathOption : (string) getcwd();
+        $projectRoot = realpath($rawPath);
         if ($projectRoot === false || !is_dir($projectRoot)) {
-            $output->writeln(sprintf('<error>Directory not found: %s</error>', $input->getOption('path')));
+            $output->writeln(sprintf('<error>Directory not found: %s</error>', $rawPath));
             return Command::FAILURE;
         }
 
+        /** @var string $format */
         $format = $input->getOption('format');
         $noAnsi = $input->getOption('plain') || !$output->isDecorated();
 

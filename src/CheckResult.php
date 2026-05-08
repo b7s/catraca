@@ -6,7 +6,7 @@ use B7S\Catraca\Enum\Status;
 
 class CheckResult
 {
-    /** @var GateResult[] */
+    /** @var array<int, GateResult> */
     private array $gates = [];
 
     public function __construct(
@@ -18,7 +18,7 @@ class CheckResult
         $this->gates[] = $gate;
     }
 
-    /** @return GateResult[] */
+    /** @return array<int, GateResult> */
     public function getGates(): array
     {
         return $this->gates;
@@ -34,7 +34,7 @@ class CheckResult
         return true;
     }
 
-    /** @return Action[] */
+    /** @return array<int, Action> */
     public function getActions(): array
     {
         $actions = [];
@@ -56,19 +56,22 @@ class CheckResult
 
     public function getPassedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g) => $g->isPass()));
+        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->isPass()));
     }
 
     public function getFailedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g) => $g->isFail()));
+        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->isFail()));
     }
 
     public function getSkippedCount(): int
     {
-        return count(array_filter($this->gates, fn(GateResult $g) => $g->status === Status::Skip));
+        return count(array_filter($this->gates, fn(GateResult $g): bool => $g->status === Status::Skip));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -81,8 +84,8 @@ class CheckResult
                 'failed' => $this->getFailedCount(),
                 'skipped' => $this->getSkippedCount(),
             ],
-            'gates' => array_map(fn(GateResult $g) => $g->toArray(), $this->gates),
-            'actions' => array_map(fn(Action $a) => $a->toArray(), $this->getActions()),
+            'gates' => array_map(fn(GateResult $g): array => $g->toArray(), $this->gates),
+            'actions' => array_map(fn(Action $a): array => $a->toArray(), $this->getActions()),
         ];
     }
 }

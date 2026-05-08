@@ -55,21 +55,20 @@ class ToolResolver
 
     private function getComposerGlobalBin(): string
     {
-        $home = getenv('COMPOSER_HOME') ?: (
-            (PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux')
-                ? ($_SERVER['HOME'] ?? '~/')
-                : (getenv('APPDATA') ?: '~/')
-        );
+        $home = getenv('COMPOSER_HOME');
+        if (is_string($home) && $home !== '') {
+            return $home . '/vendor/bin';
+        }
 
-        return $home . '/vendor/bin';
+        $fallback = (PHP_OS_FAMILY === 'Darwin' || PHP_OS_FAMILY === 'Linux')
+            ? ($_SERVER['HOME'] ?? '~/')
+            : (getenv('APPDATA') ?: '~/');
+
+        return (is_string($fallback) ? $fallback : '~/') . '/vendor/bin';
     }
 
     private function isExecutable(string $path): bool
     {
-        if (!file_exists($path) && !$this->isInPath($path)) {
-            return false;
-        }
-
         if (file_exists($path)) {
             return is_executable($path);
         }
@@ -80,12 +79,13 @@ class ToolResolver
     private function isInPath(string $command): bool
     {
         $path = getenv('PATH');
-        if ($path === false) {
+        if (!is_string($path) || $path === '') {
             return false;
         }
 
         foreach (explode(PATH_SEPARATOR, $path) as $dir) {
-            if (file_exists($dir . DIRECTORY_SEPARATOR . $command) && is_executable($dir . DIRECTORY_SEPARATOR . $command)) {
+            $fullPath = $dir . DIRECTORY_SEPARATOR . $command;
+            if (file_exists($fullPath) && is_executable($fullPath)) {
                 return true;
             }
         }

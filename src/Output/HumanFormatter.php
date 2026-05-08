@@ -5,11 +5,13 @@ namespace B7S\Catraca\Output;
 use B7S\Catraca\Action;
 use B7S\Catraca\CheckResult;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateResult;
 
 class HumanFormatter
 {
     public function format(CheckResult $result): string
     {
+        /** @var array<int, string> $lines */
         $lines = [];
 
         $lines[] = '';
@@ -17,12 +19,7 @@ class HumanFormatter
         $lines[] = $this->divider();
 
         foreach ($result->getGates() as $gate) {
-            $icon = match ($gate->status) {
-                Status::Pass => "\e[32m✔\e[0m",
-                Status::Fail => "\e[31m✘\e[0m",
-                Status::Warn => "\e[33m⚠\e[0m",
-                Status::Skip => "\e[90m—\e[0m",
-            };
+            $icon = $this->icon($gate);
             $statusLabel = strtoupper($gate->status->value);
             $lines[] = sprintf(
                 '  %s %-24s %-8s %s',
@@ -55,12 +52,7 @@ class HumanFormatter
                     $action->type->value,
                     $action->message
                 );
-                foreach (array_slice($action->files, 0, 10) as $file) {
-                    $lines[] = sprintf('      → %s', $file);
-                }
-                if (count($action->files) > 10) {
-                    $lines[] = sprintf('      → ... and %d more', count($action->files) - 10);
-                }
+                $this->formatFiles($lines, $action);
             }
             $lines[] = '';
         }
@@ -70,6 +62,7 @@ class HumanFormatter
 
     public function formatPlain(CheckResult $result): string
     {
+        /** @var array<int, string> $lines */
         $lines = [];
 
         $lines[] = '';
@@ -108,6 +101,29 @@ class HumanFormatter
         }
 
         return implode("\n", $lines) . "\n";
+    }
+
+    private function icon(GateResult $gate): string
+    {
+        return match ($gate->status) {
+            Status::Pass => "\e[32m✔\e[0m",
+            Status::Fail => "\e[31m✘\e[0m",
+            Status::Warn => "\e[33m⚠\e[0m",
+            Status::Skip => "\e[90m—\e[0m",
+        };
+    }
+
+    /**
+     * @param array<int, string> $lines
+     */
+    private function formatFiles(array &$lines, Action $action): void
+    {
+        foreach (array_slice($action->files, 0, 10) as $file) {
+            $lines[] = sprintf('      → %s', $file);
+        }
+        if (count($action->files) > 10) {
+            $lines[] = sprintf('      → ... and %d more', count($action->files) - 10);
+        }
     }
 
     private function box(string $text): string

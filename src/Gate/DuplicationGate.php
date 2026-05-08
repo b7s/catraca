@@ -6,11 +6,12 @@ use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
-class DuplicationGate
+class DuplicationGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
@@ -43,26 +44,18 @@ class DuplicationGate
         $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
         @mkdir($tmpDir, 0755, true);
 
-        $projectRoot = dirname($baseline->getPath());
-
         $process = new Process([
             $jscpd,
             '--threshold', '0',
             '--reporters', 'json',
             '--output', $tmpDir,
             '--ignore', '**/vendor/**,**/node_modules/**',
-            $projectRoot . '/src',
-            $projectRoot . '/app',
+            $baseline->projectRoot . '/src',
+            $baseline->projectRoot . '/app',
         ]);
         $process->run();
 
-        $reportPath = $tmpDir . '/jscpd-report.json';
-        $data = null;
-        if (file_exists($reportPath)) {
-            $content = file_get_contents($reportPath);
-            $data = json_decode($content, true);
-        }
-
+        $data = $this->readJsonFile($tmpDir . '/jscpd-report.json');
         $this->cleanup($tmpDir);
 
         return $this->parseJscpdResult($data, $baseline);
@@ -73,64 +66,76 @@ class DuplicationGate
         $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid();
         @mkdir($tmpDir, 0755, true);
 
-        $projectRoot = dirname($baseline->getPath());
-
         $process = new Process([
             'npx', 'jscpd',
             '--threshold', '0',
             '--reporters', 'json',
             '--output', $tmpDir,
             '--ignore', '**/vendor/**,**/node_modules/**',
-            $projectRoot . '/src',
-            $projectRoot . '/app',
+            $baseline->projectRoot . '/src',
+            $baseline->projectRoot . '/app',
         ]);
         $process->run();
 
-        $reportPath = $tmpDir . '/jscpd-report.json';
-        $data = null;
-        if (file_exists($reportPath)) {
-            $content = file_get_contents($reportPath);
-            $data = json_decode($content, true);
-        }
-
+        $data = $this->readJsonFile($tmpDir . '/jscpd-report.json');
         $this->cleanup($tmpDir);
 
         return $this->parseJscpdResult($data, $baseline);
     }
 
+    /**
+     * @param array<string, mixed>|null $data
+     */
     private function parseJscpdResult(?array $data, Baseline $baseline): GateResult
     {
         $percentage = 0.0;
+        /** @var array<int, string> $clones */
         $clones = [];
+        /** @var array<int, array{file_a: string, file_b: string, lines: int}> $cloneDetails */
         $cloneDetails = [];
 
         if ($data !== null) {
-            $statistics = $data['statistics'] ?? $data;
-            $percentage = (float) ($statistics['total']['percentage'] ?? $statistics['percentage'] ?? 0);
+            $statistics = is_array($data['statistics'] ?? null) ? $data['statistics'] : $data;
+            $rawTotal = $statistics['total'] ?? null;
+            if (is_array($rawTotal) && is_numeric($rawTotal['percentage'] ?? null)) {
+                $percentage = (float) $rawTotal['percentage'];
+            } elseif (is_numeric($statistics['percentage'] ?? null)) {
+                $percentage = (float) $statistics['percentage'];
+            }
 
-            foreach ($data['duplicates'] ?? $statistics['duplicates'] ?? [] as $dup) {
-                $first = $dup['firstFile'] ?? [];
-                $second = $dup['secondFile'] ?? [];
+            $duplicates = $data['duplicates'] ?? ($statistics['duplicates'] ?? []);
+            if (is_array($duplicates)) {
+                foreach ($duplicates as $dup) {
+                    if (!is_array($dup)) {
+                        continue;
+                    }
+                    $first = is_array($dup['firstFile'] ?? null) ? $dup['firstFile'] : [];
+                    $second = is_array($dup['secondFile'] ?? null) ? $dup['secondFile'] : [];
 
-                $firstName = $first['name'] ?? $first['path'] ?? 'unknown';
-                $secondName = $second['name'] ?? $second['path'] ?? 'unknown';
-                $lines = (int) ($dup['lines'] ?? 0);
+                    $firstName = is_string($first['name'] ?? null) ? $first['name'] : (is_string($first['path'] ?? null) ? $first['path'] : 'unknown');
+                    $secondName = is_string($second['name'] ?? null) ? $second['name'] : (is_string($second['path'] ?? null) ? $second['path'] : 'unknown');
+                    $lines = is_int($dup['lines'] ?? null) ? $dup['lines'] : 0;
+                    $firstStart = is_int($first['start'] ?? null) ? $first['start'] : 0;
+                    $firstEnd = is_int($first['end'] ?? null) ? $first['end'] : 0;
+                    $secondStart = is_int($second['start'] ?? null) ? $second['start'] : 0;
+                    $secondEnd = is_int($second['end'] ?? null) ? $second['end'] : 0;
 
-                $cloneDetails[] = [
-                    'file_a' => $firstName . ':' . ($first['start'] ?? 0) . '-' . ($first['end'] ?? 0),
-                    'file_b' => $secondName . ':' . ($second['start'] ?? 0) . '-' . ($second['end'] ?? 0),
-                    'lines' => $lines,
-                ];
-                $clones[] = sprintf(
-                    '%s:%d-%d <-> %s:%d-%d (%dL)',
-                    $firstName, $first['start'] ?? 0, $first['end'] ?? 0,
-                    $secondName, $second['start'] ?? 0, $second['end'] ?? 0,
-                    $lines
-                );
+                    $cloneDetails[] = [
+                        'file_a' => $firstName . ':' . $firstStart . '-' . $firstEnd,
+                        'file_b' => $secondName . ':' . $secondStart . '-' . $secondEnd,
+                        'lines' => $lines,
+                    ];
+                    $clones[] = sprintf(
+                        '%s:%d-%d <-> %s:%d-%d (%dL)',
+                        $firstName, $firstStart, $firstEnd,
+                        $secondName, $secondStart, $secondEnd,
+                        $lines
+                    );
+                }
             }
         }
 
-        $baselineDup = $baseline->get('duplication', 'percentage', 2.0);
+        $baselineDup = $this->getBaselineDup($baseline);
 
         $status = Status::Pass;
         $actions = null;
@@ -159,12 +164,10 @@ class DuplicationGate
 
     private function runPhpcpd(string $phpcpd, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $projectRoot = dirname($baseline->getPath());
-
         $process = new Process([
             $resolver->resolvePhp(), $phpcpd,
-            $projectRoot . '/src',
-            $projectRoot . '/app',
+            $baseline->projectRoot . '/src',
+            $baseline->projectRoot . '/app',
         ]);
         $process->run();
 
@@ -183,7 +186,7 @@ class DuplicationGate
         }
 
         $cloneCount = count($clones);
-        $baselineDup = $baseline->get('duplication', 'percentage', 2.0);
+        $baselineDup = $this->getBaselineDup($baseline);
 
         $status = $cloneCount > 0 ? Status::Fail : Status::Pass;
         $actions = null;
@@ -209,6 +212,37 @@ class DuplicationGate
         );
     }
 
+    private function getBaselineDup(Baseline $baseline): float
+    {
+        $val = $baseline->get('duplication', 'percentage', 2.0);
+        return is_numeric($val) ? (float) $val : 2.0;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readJsonFile(string $path): ?array
+    {
+        if (!file_exists($path)) {
+            return null;
+        }
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return null;
+        }
+        $data = json_decode($content, true);
+        if (!is_array($data)) {
+            return null;
+        }
+        $result = [];
+        foreach ($data as $key => $value) {
+            if (is_string($key)) {
+                $result[$key] = $value;
+            }
+        }
+        return $result;
+    }
+
     private function cleanup(string $dir): void
     {
         if (!is_dir($dir)) {
@@ -219,7 +253,14 @@ class DuplicationGate
             \RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($items as $item) {
-            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+            if (!($item instanceof \SplFileInfo)) {
+                continue;
+            }
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
         }
         @rmdir($dir);
     }

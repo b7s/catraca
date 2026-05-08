@@ -4,11 +4,13 @@ namespace B7S\Catraca\Output;
 
 use B7S\Catraca\CheckResult;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateResult;
 
 class GithubFormatter
 {
     public function format(CheckResult $result): string
     {
+        /** @var array<int, string> $lines */
         $lines = [];
 
         $lines[] = '::group::Catraca — Quality Gate Report';
@@ -34,14 +36,7 @@ class GithubFormatter
             $lines[] = sprintf('%s %s: %s', $icon, $gate->label, $gate->message);
 
             if ($gate->details !== null) {
-                $errors = $gate->details['errors'] ?? $gate->details['clones'] ?? $gate->details['oversized'] ?? [];
-                foreach (array_slice((array) $errors, 0, 10) as $detail) {
-                    if (isset($detail['file'])) {
-                        $line = $detail['line'] ?? 0;
-                        $message = $detail['message'] ?? ($detail['file'] ?? '');
-                        $lines[] = sprintf('::%s file=%s,line=%d::%s', $annotationLevel, $detail['file'], $line, $message);
-                    }
-                }
+                $this->annotateDetails($lines, $gate, $annotationLevel);
             }
         }
 
@@ -65,5 +60,27 @@ class GithubFormatter
         }
 
         return implode("\n", $lines) . "\n";
+    }
+
+    /**
+     * @param array<int, string> $lines
+     */
+    private function annotateDetails(array &$lines, GateResult $gate, string $annotationLevel): void
+    {
+        $errors = $gate->details['errors'] ?? $gate->details['clones'] ?? $gate->details['oversized'] ?? [];
+        if (!is_array($errors)) {
+            return;
+        }
+        foreach (array_slice($errors, 0, 10) as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+            $file = $detail['file'] ?? null;
+            $line = $detail['line'] ?? 0;
+            $message = $detail['message'] ?? ($detail['file'] ?? '');
+            if (is_string($file) && is_int($line) && is_string($message)) {
+                $lines[] = sprintf('::%s file=%s,line=%d::%s', $annotationLevel, $file, $line, $message);
+            }
+        }
     }
 }

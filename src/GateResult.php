@@ -2,21 +2,17 @@
 
 namespace B7S\Catraca;
 
+use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 
 readonly class GateResult
 {
     /**
-     * @param Status $status pass, fail, skip, warn
-     * @param string $name Machine key (e.g. "security", "style")
-     * @param string $label Human label (e.g. "Security Audit")
-     * @param string $message One-line summary
-     * @param Severity $severity block or warn
-     * @param array|null $baseline Baseline metrics
-     * @param array|null $current Current metrics
-     * @param array<array{type: Enum\ActionType, message: string, files?: string[]}>|null $actions
-     * @param array|null $details Raw tool output / structured details
+     * @param array<mixed, mixed>|null $baseline
+     * @param array<mixed, mixed>|null $current
+     * @param array<array{type: ActionType, message: string, files?: array<int, string>}>|null $actions
+     * @param array<mixed, mixed>|null $details
      */
     public function __construct(
         public Status $status,
@@ -40,6 +36,9 @@ readonly class GateResult
         return $this->status === Status::Fail;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         $result = [
@@ -57,7 +56,7 @@ readonly class GateResult
             $result['current'] = $this->current;
         }
         if ($this->actions !== null) {
-            $result['actions'] = array_map(fn($a) => [
+            $result['actions'] = array_map(fn(array $a): array => [
                 'type' => $a['type']->value,
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],

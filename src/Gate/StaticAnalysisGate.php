@@ -6,11 +6,12 @@ use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
-class StaticAnalysisGate
+class StaticAnalysisGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
@@ -35,46 +36,69 @@ class StaticAnalysisGate
 
     private function runPhpstan(string $phpstan, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $projectRoot = dirname($baseline->getPath());
-
         $args = [
             $resolver->resolvePhp(), $phpstan,
             'analyse', '--memory-limit=512M',
             '--error-format=json', '--no-progress',
         ];
 
-        if (!$this->hasPhpstanConfig($projectRoot)) {
+        if (!$this->hasPhpstanConfig($baseline->projectRoot)) {
             $args[] = '--level=5';
         }
 
         $process = new Process($args);
-        $process->setWorkingDirectory($projectRoot);
+        $process->setWorkingDirectory($baseline->projectRoot);
         $process->run();
 
-        $output = $process->getOutput() ?: $process->getErrorOutput();
+        $output = $process->getOutput() !== '' ? $process->getOutput() : $process->getErrorOutput();
         $data = json_decode($output, true);
 
+        /** @var array<int, array{file: string, line: int, message: string, ignorable: bool}> $errors */
         $errors = [];
+        /** @var array<int, string> $files */
         $files = [];
+        /** @var array{file_errors: int, errors: int} $totals */
         $totals = ['file_errors' => 0, 'errors' => 0];
 
         if (is_array($data)) {
-            $totals = $data['totals'] ?? ['file_errors' => 0, 'errors' => 0];
-            foreach ($data['files'] ?? [] as $filePath => $fileData) {
-                foreach ($fileData['messages'] ?? [] as $msg) {
-                    $errors[] = [
-                        'file' => $filePath,
-                        'line' => $msg['line'] ?? 0,
-                        'message' => $msg['message'] ?? '',
-                        'ignorable' => $msg['ignorable'] ?? true,
-                    ];
-                    $files[] = $filePath . ':' . ($msg['line'] ?? 0);
+            $rawTotals = $data['totals'] ?? [];
+            if (is_array($rawTotals)) {
+                $totals = [
+                    'file_errors' => is_int($rawTotals['file_errors'] ?? null) ? $rawTotals['file_errors'] : 0,
+                    'errors' => is_int($rawTotals['errors'] ?? null) ? $rawTotals['errors'] : 0,
+                ];
+            }
+
+            $rawFiles = $data['files'] ?? [];
+            if (is_array($rawFiles)) {
+                foreach ($rawFiles as $filePath => $fileData) {
+                    if (!is_string($filePath) || !is_array($fileData)) {
+                        continue;
+                    }
+                    $messages = $fileData['messages'] ?? [];
+                    if (!is_array($messages)) {
+                        continue;
+                    }
+                    foreach ($messages as $msg) {
+                        if (!is_array($msg)) {
+                            continue;
+                        }
+                        $errors[] = [
+                            'file' => $filePath,
+                            'line' => is_int($msg['line'] ?? null) ? $msg['line'] : 0,
+                            'message' => is_string($msg['message'] ?? null) ? $msg['message'] : '',
+                            'ignorable' => ($msg['ignorable'] ?? true) === true,
+                        ];
+                        $files[] = $filePath . ':' . (is_int($msg['line'] ?? null) ? $msg['line'] : 0);
+                    }
                 }
             }
         }
 
-        $errorCount = ($totals['file_errors'] ?? 0) + ($totals['errors'] ?? 0);
-        $baselineErrors = $baseline->get('static_analysis', 'errors', 0);
+        $errorCount = $totals['file_errors'] + $totals['errors'];
+        $baselineErrors = is_int($baseline->get('static_analysis', 'errors', 0))
+            ? $baseline->get('static_analysis', 'errors', 0)
+            : 0;
 
         $status = Status::Pass;
         $actions = null;
@@ -109,28 +133,37 @@ class StaticAnalysisGate
         ]);
         $process->run();
 
-        $output = $process->getOutput() ?: $process->getErrorOutput();
+        $output = $process->getOutput() !== '' ? $process->getOutput() : $process->getErrorOutput();
         $data = json_decode($output, true);
 
+        /** @var array<int, array{file: string, line: int, message: string, severity: string}> $errors */
         $errors = [];
+        /** @var array<int, string> $files */
         $files = [];
 
         if (is_array($data)) {
             foreach ($data as $issue) {
-                if (isset($issue['file_path'])) {
+                if (!is_array($issue)) {
+                    continue;
+                }
+                $filePath = $issue['file_path'] ?? null;
+                if (is_string($filePath)) {
+                    $line = is_int($issue['line_from'] ?? null) ? $issue['line_from'] : 0;
                     $errors[] = [
-                        'file' => $issue['file_path'],
-                        'line' => $issue['line_from'] ?? 0,
-                        'message' => $issue['message'] ?? '',
-                        'severity' => $issue['severity'] ?? 'error',
+                        'file' => $filePath,
+                        'line' => $line,
+                        'message' => is_string($issue['message'] ?? null) ? $issue['message'] : '',
+                        'severity' => is_string($issue['severity'] ?? null) ? $issue['severity'] : 'error',
                     ];
-                    $files[] = $issue['file_path'] . ':' . ($issue['line_from'] ?? 0);
+                    $files[] = $filePath . ':' . $line;
                 }
             }
         }
 
         $errorCount = count($errors);
-        $baselineErrors = $baseline->get('static_analysis', 'errors', 0);
+        $baselineErrors = is_int($baseline->get('static_analysis', 'errors', 0))
+            ? $baseline->get('static_analysis', 'errors', 0)
+            : 0;
 
         $status = Status::Pass;
         $actions = null;

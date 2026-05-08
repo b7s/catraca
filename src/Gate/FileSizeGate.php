@@ -6,26 +6,29 @@ use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use SplFileInfo;
 
-class FileSizeGate
+class FileSizeGate implements GateInterface
 {
-    private const MAX_LINES = 1000;
-
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $projectRoot = dirname($baseline->getPath());
-        $maxLines = $baseline->get('file_size', 'max_lines', self::MAX_LINES) ?: self::MAX_LINES;
+        $maxLines = $baseline->get('file_size', 'max_lines', 1000);
+        if (!is_int($maxLines) || $maxLines <= 0) {
+            $maxLines = 1000;
+        }
 
+        /** @var array<int, array{file: string, lines: int, limit: int, excess: int}> $oversized */
         $oversized = [];
-        $dirs = [$projectRoot . '/src', $projectRoot . '/app', $projectRoot . '/lib'];
+        $dirs = [$baseline->projectRoot . '/src', $baseline->projectRoot . '/app', $baseline->projectRoot . '/lib'];
 
         foreach ($dirs as $dir) {
             if (!is_dir($dir)) {
                 continue;
             }
-            $this->scanDirectory($dir, $maxLines, $oversized, $projectRoot);
+            $this->scanDirectory($dir, $maxLines, $oversized, $baseline->projectRoot);
         }
 
         $status = Status::Pass;
@@ -36,7 +39,7 @@ class FileSizeGate
             $actions = [[
                 'type' => ActionType::Modularize,
                 'message' => sprintf('%d files exceed %d lines — split into smaller modules', count($oversized), $maxLines),
-                'files' => array_map(fn($f) => $f['file'] . ' (' . $f['lines'] . 'L)', $oversized),
+                'files' => array_map(fn(array $f): string => $f['file'] . ' (' . $f['lines'] . 'L)', $oversized),
             ]];
         }
 
@@ -53,6 +56,9 @@ class FileSizeGate
         );
     }
 
+    /**
+     * @param array<int, array{file: string, lines: int, limit: int, excess: int}> $oversized
+     */
     private function scanDirectory(string $dir, int $maxLines, array &$oversized, string $root): void
     {
         $iterator = new \RecursiveIteratorIterator(
@@ -60,7 +66,7 @@ class FileSizeGate
         );
 
         foreach ($iterator as $file) {
-            if (!$file->isFile() || $file->getExtension() !== 'php') {
+            if (!($file instanceof SplFileInfo) || !$file->isFile() || $file->getExtension() !== 'php') {
                 continue;
             }
 

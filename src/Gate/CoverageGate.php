@@ -6,11 +6,12 @@ use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
+use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
-class CoverageGate
+class CoverageGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
@@ -47,14 +48,14 @@ class CoverageGate
         ]);
         $process->run();
 
-        $this->cleanup($tmpDir);
-
         $coverage = $this->parseClover($cloverPath);
         if ($coverage === null) {
             $coverage = $this->parseCoverageFromText($process->getOutput());
         }
 
-        $baselineCoverage = $baseline->get('coverage', 'percentage', 85.0);
+        $this->cleanup($tmpDir);
+
+        $baselineCoverage = $this->getBaselineCoverage($baseline);
 
         $status = Status::Pass;
         $actions = null;
@@ -93,7 +94,7 @@ class CoverageGate
         $process->run();
 
         $coverage = $this->parseCoverageFromText($process->getOutput());
-        $baselineCoverage = $baseline->get('coverage', 'percentage', 85.0);
+        $baselineCoverage = $this->getBaselineCoverage($baseline);
 
         $status = Status::Pass;
         $actions = null;
@@ -121,6 +122,12 @@ class CoverageGate
             current: ['percentage' => $coverage],
             actions: $actions,
         );
+    }
+
+    private function getBaselineCoverage(Baseline $baseline): float
+    {
+        $val = $baseline->get('coverage', 'percentage', 85.0);
+        return is_numeric($val) ? (float) $val : 85.0;
     }
 
     private function parseClover(string $path): ?float

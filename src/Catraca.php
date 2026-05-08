@@ -15,10 +15,10 @@ class Catraca
     private Baseline $baseline;
     private ToolResolver $resolver;
 
-    /** @var array<array{gate: object, name: string}> */
+    /** @var array<int, array{gate: GateInterface, name: string}> */
     private array $gates = [];
 
-    public function __construct(private readonly string $projectRoot)
+    public function __construct(string $projectRoot)
     {
         $this->baseline = new Baseline($projectRoot);
         $this->resolver = new ToolResolver($projectRoot);
