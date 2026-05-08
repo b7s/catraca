@@ -1,0 +1,59 @@
+<?php
+
+namespace B7S\RatchetBabysit\Command;
+
+use B7S\RatchetBabysit\Output\GithubFormatter;
+use B7S\RatchetBabysit\Output\HumanFormatter;
+use B7S\RatchetBabysit\Output\JsonFormatter;
+use B7S\RatchetBabysit\RatchetBabysit;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+#[AsCommand(
+    name: 'init',
+    description: 'Initialize baseline.json with current metrics',
+)]
+class InitCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this
+            ->addOption('path', 'p', InputOption::VALUE_REQUIRED, 'Project root path', getcwd())
+            ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: human, json, github', 'human')
+            ->addOption('plain', null, InputOption::VALUE_NONE, 'Plain text output (no ANSI colors)');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $projectRoot = realpath($input->getOption('path'));
+        if ($projectRoot === false || !is_dir($projectRoot)) {
+            $output->writeln(sprintf('<error>Directory not found: %s</error>', $input->getOption('path')));
+            return Command::FAILURE;
+        }
+
+        $format = $input->getOption('format');
+        $noAnsi = $input->getOption('plain') || !$output->isDecorated();
+
+        $babysit = new RatchetBabysit($projectRoot);
+        $result = $babysit->init();
+
+        $formatted = match ($format) {
+            'json' => (new JsonFormatter())->format($result),
+            'github' => (new GithubFormatter())->format($result),
+            'human' => $noAnsi
+                ? (new HumanFormatter())->formatPlain($result)
+                : (new HumanFormatter())->format($result),
+            default => (new HumanFormatter())->format($result),
+        };
+
+        $output->write($formatted);
+
+        $output->writeln('');
+        $output->writeln(sprintf('<info>Baseline written to %s/baseline.json</info>', $projectRoot));
+
+        return Command::SUCCESS;
+    }
+}

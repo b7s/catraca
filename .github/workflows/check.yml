@@ -1,0 +1,41 @@
+name: Ratchet Babysit
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: pcov
+          tools: composer, phpstan, pint, phpmetrics
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Install ratchet-babysit
+        run: composer require --dev b7s/ratchet-babysit
+
+      - name: Initialize baseline (first run only)
+        run: vendor/bin/ratchet-babysit init --plain
+        continue-on-error: true
+
+      - name: Run quality gates
+        run: vendor/bin/ratchet-babysit check --format=github --plain
+
+      - name: Upload baseline artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline
+          path: baseline.json
+          retention-days: 30

@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php
+
+use B7S\RatchetBabysit\Command\CheckCommand;
+use B7S\RatchetBabysit\Command\InitCommand;
+use Symfony\Component\Console\Application;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$application = new Application('ratchet-babysit', '1.0.0');
+$application->add(new InitCommand());
+$application->add(new CheckCommand());
+$application->setDefaultCommand('check', true);
+$application->run();
