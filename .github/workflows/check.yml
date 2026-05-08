@@ -22,15 +22,12 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - name: Install catraca
-        run: composer require --dev b7s/catraca
-
       - name: Initialize baseline (first run only)
-        run: vendor/bin/catraca init --plain
+        run: php bin/catraca init --plain
         continue-on-error: true
 
       - name: Run quality gates
-        run: vendor/bin/catraca check --format=github --plain
+        run: php bin/catraca check --format=github --plain
 
       - name: Upload baseline artifact
         if: always()
