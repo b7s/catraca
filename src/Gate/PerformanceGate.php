@@ -86,35 +86,12 @@ class PerformanceGate implements GateInterface
             return null;
         }
 
-        $process = new Process([
-            $resolver->resolvePhp(), $fixer,
-            'fix',
-            '--dry-run',
-            '--diff',
-            '--format=json',
-            '--rules={"global_namespace_import":{"import_classes":true,"import_constants":true,"import_functions":true}}',
-        ]);
-        $process->run();
-
-        $output = $process->getOutput();
-        $violations = 0;
-        /** @var array<int, string> $files */
-        $files = [];
-
-        $data = json_decode($output, true);
-        if (is_array($data)) {
-            foreach ($data as $value) {
-                if (is_array($value) && isset($value['file']) && is_string($value['file'])) {
-                    $files[] = $value['file'];
-                }
-            }
-            $violations = count($files);
-        }
+        $result = $this->runCsFixerRule($fixer, $resolver, '{"global_namespace_import":{"import_classes":true,"import_constants":true,"import_functions":true}}');
 
         return [
-            'violations' => $violations,
-            'files' => $files,
-            'message' => sprintf('%d global imports missing (use class/function/const)', $violations),
+            'violations' => $result['violations'],
+            'files' => $result['files'],
+            'message' => sprintf('%d global imports missing (use class/function/const)', $result['violations']),
         ];
     }
 
@@ -125,13 +102,24 @@ class PerformanceGate implements GateInterface
             return null;
         }
 
+        $result = $this->runCsFixerRule($fixer, $resolver, 'no_unused_imports');
+
+        return [
+            'violations' => $result['violations'],
+            'files' => $result['files'],
+            'message' => sprintf('%d files with unused imports', $result['violations']),
+        ];
+    }
+
+    private function runCsFixerRule(string $fixer, ToolResolver $resolver, string $rules): array
+    {
         $process = new Process([
             $resolver->resolvePhp(), $fixer,
             'fix',
             '--dry-run',
             '--diff',
             '--format=json',
-            '--rules=no_unused_imports',
+            '--rules='.$rules,
         ]);
         $process->run();
 
@@ -150,11 +138,7 @@ class PerformanceGate implements GateInterface
             $violations = count($files);
         }
 
-        return [
-            'violations' => $violations,
-            'files' => $files,
-            'message' => sprintf('%d files with unused imports', $violations),
-        ];
+        return ['violations' => $violations, 'files' => $files];
     }
 
     private function checkAutoloadOptimization(ToolResolver $resolver): ?array
