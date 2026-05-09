@@ -2,6 +2,7 @@
 <?php
 
 use B7S\Catraca\Command\CheckCommand;
+use B7S\Catraca\Command\FixCommand;
 use B7S\Catraca\Command\InitCommand;
 use Symfony\Component\Console\Application;
 
@@ -18,6 +19,7 @@ $application = new Application('catraca', $version);
 $application->addCommands([
     new InitCommand(),
     new CheckCommand(),
+    new FixCommand(),
 ]);
 $application->setDefaultCommand('check', false);
 $application->run();

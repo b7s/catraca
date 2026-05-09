@@ -90,6 +90,25 @@ vendor/bin/catraca check --format=github
 vendor/bin/catraca check --path=/path/to/project
 ```
 
+### `catraca fix` — Auto-fix issues
+
+Runs auto-fixers for code style, performance, and autoload optimization.
+
+```bash
+vendor/bin/catraca fix
+
+# Specify project path
+vendor/bin/catraca fix --path=/path/to/project
+```
+
+What it fixes:
+
+| Fixer | Tool | What it does |
+|-------|------|--------------|
+| Code Style | `pint` or `php-cs-fixer` | Fixes all code style violations |
+| Performance | `php-cs-fixer` | Adds missing imports, removes unused imports, cleans FQCNs and closures |
+| Autoload | `composer` | Runs `composer dump-autoload -o` if not optimized |
+
 ### Exit Codes
 
 | Code | Meaning |
