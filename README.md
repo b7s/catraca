@@ -65,12 +65,13 @@ Default baseline:
 | Duplication | 2% maximum |
 | File Size | 1000 lines maximum per file |
 | Complexity | Block at CCN 50, warn at CCN 20 |
+| Performance | 0 violations |
 
 You can edit `baseline.json` directly to adjust thresholds.
 
 ### `catraca check` — Run quality gates
 
-Runs all 7 gates and compares against baseline. If `baseline.json` doesn't exist, it is created automatically.
+Runs all 8 gates and compares against baseline. If `baseline.json` doesn't exist, it is created automatically.
 
 ```bash
 # Human-readable (default)
@@ -180,6 +181,7 @@ Gates run in order. A failure blocks the PR.
 | 5 | Duplication | `jscpd` or `phpcpd` | 2% maximum |
 | 6 | File Size | Built-in | 1000 lines per file |
 | 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
+| 8 | Performance | `php-cs-fixer` | 0 violations |
 
 ### PHPStan Configuration
 
@@ -207,7 +209,6 @@ jobs:
           tools: composer, phpstan, pint, phpmetrics
 
       - run: composer install --no-interaction --prefer-dist
-      - run: composer require --dev b7s/catraca
       - run: vendor/bin/catraca init --plain
         continue-on-error: true
       - run: vendor/bin/catraca check --format=github --plain
