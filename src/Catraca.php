@@ -7,6 +7,7 @@ use B7S\Catraca\Gate\ComplexityGate;
 use B7S\Catraca\Gate\CoverageGate;
 use B7S\Catraca\Gate\DuplicationGate;
 use B7S\Catraca\Gate\FileSizeGate;
+use B7S\Catraca\Gate\PerformanceGate;
 use B7S\Catraca\Gate\SecurityGate;
 use B7S\Catraca\Gate\StaticAnalysisGate;
 use B7S\Catraca\Gate\StyleGate;
@@ -34,6 +35,7 @@ class Catraca
             ['gate' => new DuplicationGate, 'name' => 'Duplication'],
             ['gate' => new FileSizeGate, 'name' => 'File Size'],
             ['gate' => new ComplexityGate, 'name' => 'Cyclomatic Complexity'],
+            ['gate' => new PerformanceGate, 'name' => 'Performance'],
         ];
     }
 
