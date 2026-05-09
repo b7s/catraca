@@ -36,13 +36,13 @@ class SecurityGate implements GateInterface
         $rawAdvisories = $data['advisories'] ?? [];
         $advisories = is_array($rawAdvisories) ? $rawAdvisories : [];
 
-        $critical = array_filter($advisories, function (mixed $a): bool {
+        $critical = array_filter($advisories, static function (mixed $a): bool {
             if (! is_array($a)) {
                 return false;
             }
             $severity = $a['severity'] ?? '';
 
-            return is_string($severity) && in_array($severity, ['critical', 'high'], true);
+            return in_array($severity, ['critical', 'high'], true);
         });
 
         $criticalCount = count($critical);

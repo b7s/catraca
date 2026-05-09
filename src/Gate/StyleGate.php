@@ -65,10 +65,10 @@ class StyleGate implements GateInterface
 
         if ($violations === 0 && $exitCode !== 0) {
             $lines = array_filter(explode("\n", $output));
-            $dirtyFiles = array_filter($lines, fn (string $l): bool => preg_match('/\.(php|blade\.php)$/', $l) && ! str_contains($l, ' '));
+            $dirtyFiles = array_filter($lines, static fn (string $l): bool => preg_match('/\.(php|blade\.php)$/', $l) && ! str_contains($l, ' '));
             if (count($dirtyFiles) > 0) {
                 $violations = count($dirtyFiles);
-                $files = array_values(array_map(fn (string $f): string => trim($f), $dirtyFiles));
+                $files = array_values(array_map(static fn (string $f): string => trim($f), $dirtyFiles));
             } else {
                 $violations = 1;
                 $files[] = 'Run `pint --test` for details';
@@ -76,18 +76,7 @@ class StyleGate implements GateInterface
         }
 
         $baselineViolations = $baseline->get('style', 'violations', 0);
-
-        $status = Status::Pass;
-        $actions = null;
-
-        if ($violations > 0) {
-            $status = Status::Fail;
-            $actions = [[
-                'type' => ActionType::FixStyle,
-                'message' => sprintf('Fix %d code style violations', $violations),
-                'files' => array_slice($files, 0, 50),
-            ]];
-        }
+        [$status, $actions] = $this->evaluateStyleViolations($violations, $files);
 
         return new GateResult(
             status: $status,
@@ -125,7 +114,22 @@ class StyleGate implements GateInterface
         }
 
         $baselineViolations = $baseline->get('style', 'violations', 0);
+        [$status, $actions] = $this->evaluateStyleViolations($violations, $files);
 
+        return new GateResult(
+            status: $status,
+            name: 'style',
+            label: 'Code Style',
+            message: sprintf('%d violations (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0),
+            severity: Severity::Block,
+            baseline: ['violations' => $baselineViolations],
+            current: ['violations' => $violations],
+            actions: $actions,
+        );
+    }
+
+    private function evaluateStyleViolations(int $violations, array $files): array
+    {
         $status = Status::Pass;
         $actions = null;
 
@@ -138,15 +142,6 @@ class StyleGate implements GateInterface
             ]];
         }
 
-        return new GateResult(
-            status: $status,
-            name: 'style',
-            label: 'Code Style',
-            message: sprintf('%d violations (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0),
-            severity: Severity::Block,
-            baseline: ['violations' => $baselineViolations],
-            current: ['violations' => $violations],
-            actions: $actions,
-        );
+        return [$status, $actions];
     }
 }

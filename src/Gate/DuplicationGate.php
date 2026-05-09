@@ -9,7 +9,10 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 use Symfony\Component\Process\Process;
 
 class DuplicationGate implements GateInterface
@@ -249,12 +252,12 @@ class DuplicationGate implements GateInterface
         if (! is_dir($dir)) {
             return;
         }
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($items as $item) {
-            if (! ($item instanceof \SplFileInfo)) {
+            if (! ($item instanceof SplFileInfo)) {
                 continue;
             }
             if ($item->isDir()) {

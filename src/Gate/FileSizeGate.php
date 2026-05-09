@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use RecursiveDirectoryIterator;
 use SplFileInfo;
 
 class FileSizeGate implements GateInterface
@@ -39,7 +40,7 @@ class FileSizeGate implements GateInterface
             $actions = [[
                 'type' => ActionType::Modularize,
                 'message' => sprintf('%d files exceed %d lines — split into smaller modules', count($oversized), $maxLines),
-                'files' => array_map(fn (array $f): string => $f['file'].' ('.$f['lines'].'L)', $oversized),
+                'files' => array_map(static fn (array $f): string => $f['file'].' ('.$f['lines'].'L)', $oversized),
             ]];
         }
 
@@ -62,7 +63,7 @@ class FileSizeGate implements GateInterface
     private function scanDirectory(string $dir, int $maxLines, array &$oversized, string $root): void
     {
         $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
         );
 
         foreach ($iterator as $file) {
