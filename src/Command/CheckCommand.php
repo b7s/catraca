@@ -18,6 +18,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class CheckCommand extends Command
 {
+    use CommandHelper;
+
     protected function configure(): void
     {
         $this
@@ -28,18 +30,12 @@ class CheckCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $pathOption = $input->getOption('path');
-        $rawPath = is_string($pathOption) ? $pathOption : (string) getcwd();
-        $projectRoot = realpath($rawPath);
-        if ($projectRoot === false || ! is_dir($projectRoot)) {
-            $output->writeln(sprintf('<error>Directory not found: %s</error>', $rawPath));
-
+        $projectRoot = $this->resolveProjectRoot($input, $output);
+        if ($projectRoot === null) {
             return Command::FAILURE;
         }
 
-        /** @var string $format */
-        $format = $input->getOption('format');
-        $noAnsi = $input->getOption('plain') || ! $output->isDecorated();
+        $format = $this->resolveFormat($input, $output);
 
         $catraca = new Catraca($projectRoot);
         $result = $catraca->check();
@@ -47,7 +43,7 @@ class CheckCommand extends Command
         $formatted = match ($format) {
             'json' => (new JsonFormatter)->format($result),
             'github' => (new GithubFormatter)->format($result),
-            'human' => $noAnsi
+            'human' => $this->isPlainOutput($input, $output)
                 ? (new HumanFormatter)->formatPlain($result)
                 : (new HumanFormatter)->format($result),
             default => (new HumanFormatter)->format($result),
