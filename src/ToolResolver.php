@@ -8,6 +8,11 @@ class ToolResolver
         private readonly string $projectRoot,
     ) {}
 
+    public function getProjectRoot(): string
+    {
+        return $this->projectRoot;
+    }
+
     public function resolve(string $tool): ?string
     {
         $candidates = [

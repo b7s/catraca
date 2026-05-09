@@ -18,15 +18,39 @@ class PerformanceGate implements GateInterface
         $violations = 0;
         $files = [];
         $messages = [];
+        $hasTool = false;
 
-        $importResult = $this->checkFunctionImports($resolver);
+        $importResult = $this->checkGlobalImports($resolver);
         if ($importResult !== null) {
+            $hasTool = true;
             $violations += $importResult['violations'];
             $files = array_merge($files, $importResult['files']);
-            $messages[] = $importResult['message'];
+            if ($importResult['violations'] > 0) {
+                $messages[] = $importResult['message'];
+            }
         }
 
-        if ($violations === 0 && $messages === []) {
+        $unusedResult = $this->checkUnusedImports($resolver);
+        if ($unusedResult !== null) {
+            $hasTool = true;
+            $violations += $unusedResult['violations'];
+            $files = array_merge($files, $unusedResult['files']);
+            if ($unusedResult['violations'] > 0) {
+                $messages[] = $unusedResult['message'];
+            }
+        }
+
+        $autoloadResult = $this->checkAutoloadOptimization($resolver);
+        if ($autoloadResult !== null) {
+            $hasTool = true;
+            $violations += $autoloadResult['violations'];
+            $files = array_merge($files, $autoloadResult['files']);
+            if ($autoloadResult['violations'] > 0) {
+                $messages[] = $autoloadResult['message'];
+            }
+        }
+
+        if (! $hasTool) {
             return new GateResult(
                 status: Status::Skip,
                 name: 'performance',
@@ -37,7 +61,7 @@ class PerformanceGate implements GateInterface
         }
 
         $baselineViolations = $baseline->get('performance', 'violations', 0);
-        [$status, $actions] = $this->evaluateViolations($violations, $files);
+        [$status, $actions] = $this->evaluateViolations($violations, $files, $messages);
 
         $message = $violations > 0
             ? sprintf('%d improvement(s) found (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0)
@@ -55,7 +79,7 @@ class PerformanceGate implements GateInterface
         );
     }
 
-    private function checkFunctionImports(ToolResolver $resolver): ?array
+    private function checkGlobalImports(ToolResolver $resolver): ?array
     {
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer === null) {
@@ -68,7 +92,7 @@ class PerformanceGate implements GateInterface
             '--dry-run',
             '--diff',
             '--format=json',
-            '--rules=global_namespace_import',
+            '--rules={"global_namespace_import":{"import_classes":true,"import_constants":true,"import_functions":true}}',
         ]);
         $process->run();
 
@@ -90,13 +114,74 @@ class PerformanceGate implements GateInterface
         return [
             'violations' => $violations,
             'files' => $files,
-            'message' => $violations > 0
-                ? sprintf('%d functions should use "use function"', $violations)
-                : 'Function imports OK',
+            'message' => sprintf('%d global imports missing (use class/function/const)', $violations),
         ];
     }
 
-    private function evaluateViolations(int $violations, array $files): array
+    private function checkUnusedImports(ToolResolver $resolver): ?array
+    {
+        $fixer = $resolver->resolve('php-cs-fixer');
+        if ($fixer === null) {
+            return null;
+        }
+
+        $process = new Process([
+            $resolver->resolvePhp(), $fixer,
+            'fix',
+            '--dry-run',
+            '--diff',
+            '--format=json',
+            '--rules=no_unused_imports',
+        ]);
+        $process->run();
+
+        $output = $process->getOutput();
+        $violations = 0;
+        /** @var array<int, string> $files */
+        $files = [];
+
+        $data = json_decode($output, true);
+        if (is_array($data)) {
+            foreach ($data as $value) {
+                if (is_array($value) && isset($value['file']) && is_string($value['file'])) {
+                    $files[] = $value['file'];
+                }
+            }
+            $violations = count($files);
+        }
+
+        return [
+            'violations' => $violations,
+            'files' => $files,
+            'message' => sprintf('%d files with unused imports', $violations),
+        ];
+    }
+
+    private function checkAutoloadOptimization(ToolResolver $resolver): ?array
+    {
+        $composer = $resolver->resolve('composer');
+        if ($composer === null) {
+            return null;
+        }
+
+        $autoloadFile = $resolver->getProjectRoot().'/vendor/composer/autoload_classmap.php';
+
+        if (! file_exists($autoloadFile)) {
+            return [
+                'violations' => 1,
+                'files' => [],
+                'message' => 'Autoload not optimized — run "composer dump-autoload -o"',
+            ];
+        }
+
+        return [
+            'violations' => 0,
+            'files' => [],
+            'message' => '',
+        ];
+    }
+
+    private function evaluateViolations(int $violations, array $files, array $messages): array
     {
         $status = Status::Pass;
         $actions = null;
@@ -105,7 +190,7 @@ class PerformanceGate implements GateInterface
             $status = Status::Fail;
             $actions = [[
                 'type' => ActionType::ImprovePerformance,
-                'message' => sprintf('Fix %d performance improvement(s)', $violations),
+                'message' => implode('; ', $messages),
                 'files' => array_slice($files, 0, 50),
             ]];
         }
