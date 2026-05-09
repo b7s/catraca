@@ -217,9 +217,12 @@ The Performance gate runs 5 sub-checks:
 
 If your project has a `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon`, Catraca uses it as-is. If no config file exists, it defaults to **level 5**.
 
-## GitHub Actions
+## CI/CD Integration
+
+### GitHub Actions
 
 ```yaml
+# .github/workflows/catraca.yml
 name: Catraca Quality Gate
 
 on:
@@ -244,26 +247,117 @@ jobs:
       - run: vendor/bin/catraca check --format=github --plain
 ```
 
+### GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - test
+
+catraca:
+  stage: test
+  image: php:8.3-cli
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - vendor/
+  before_script:
+    - apt-get update -qq && apt-get install -yqq unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer install --no-interaction --prefer-dist
+  script:
+    - vendor/bin/catraca init --plain || true
+    - vendor/bin/catraca check --plain
+```
+
+### Forgejo Actions
+
+Uses the same `--format=github` output — Forgejo Runner supports GitHub Actions workflow commands (`::error::`, `::warning::`, `::group::`).
+
+```yaml
+# .forgejo/workflows/catraca.yml
+name: Catraca Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-gate:
+    runs-on: docker
+    container:
+      image: php:8.3-cli
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Install Composer
+        run: |
+          apt-get update -qq && apt-get install -yqq unzip
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Init Baseline
+        run: vendor/bin/catraca init --plain
+        continue-on-error: true
+
+      - name: Run Quality Gate
+        run: vendor/bin/catraca check --format=github --plain
+```
+
+> **Note:** Adjust `runs-on` to match your runner's labels (e.g., `docker`, `ubuntu-latest`, `self-hosted`).
+
 ## GrumPHP Integration
 
+Create a custom task in your project:
+
 ```php
+// app/GrumPHP/CatracaTask.php
 use GrumPHP\Runner\TaskResult;
 use GrumPHP\Task\AbstractExternalTask;
+use GrumPHP\Task\Config\EmptyTaskConfig;
+use GrumPHP\Task\Config\TaskConfigInterface;
 
 class CatracaTask extends AbstractExternalTask
 {
+    public function getConfig(): TaskConfigInterface
+    {
+        return new EmptyTaskConfig;
+    }
+
     public function run(): TaskResult
     {
-        $process = $this->processBuilder->build(['vendor/bin/catraca', 'check', '--format=json']);
+        $process = $this->processBuilder->build(['vendor/bin/catraca', 'check', '--plain']);
         $process->run();
 
         if (!$process->isSuccessful()) {
-            return TaskResult::createFailed($this, $this->getContext(), $process->getOutput());
+            return TaskResult::createFailed($this, $this->getContext(), [
+                $process->getOutput(),
+            ]);
         }
 
         return TaskResult::createPassed($this, $this->getContext());
     }
 }
+```
+
+Register it in `grumphp.yml`:
+
+```yaml
+# grumphp.yml
+grumphp:
+  tasks:
+    catraca: ~
+
+services:
+  CatracaTask:
+    class: App\GrumPHP\CatracaTask
+    arguments:
+      - '@process_builder'
+      - '@formatter.raw_process'
+    tags:
+      - { name: grumphp.task, task: catraca }
 ```
 
 ## Programmatic Usage
