@@ -34,8 +34,8 @@ jobs:
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - name: Run Tests
-        run: ./vendor/bin/pest
+      - name: Check Quality
+        run: ./bin/catraca --format=github --plain
 
       - name: Extract version from tag
         id: version
