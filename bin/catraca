@@ -5,7 +5,11 @@ use B7S\Catraca\Command\CheckCommand;
 use B7S\Catraca\Command\InitCommand;
 use Symfony\Component\Console\Application;
 
-require __DIR__ . '/../vendor/autoload.php';
+$autoload = __DIR__ . '/../vendor/autoload.php';
+if (! file_exists($autoload)) {
+    $autoload = __DIR__ . '/../../../autoload.php';
+}
+require $autoload;
 
 $application = new Application('catraca', '1.0.0');
 $application->addCommands([
