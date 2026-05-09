@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class CoverageGate implements GateInterface
@@ -36,8 +37,10 @@ class CoverageGate implements GateInterface
 
     private function runPhpunit(string $phpunit, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
-        @mkdir($tmpDir, 0755, true);
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
+        if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $tmpDir));
+        }
 
         $cloverPath = $tmpDir.'/clover.xml';
 
@@ -56,18 +59,7 @@ class CoverageGate implements GateInterface
         $this->cleanup($tmpDir);
 
         $baselineCoverage = $this->getBaselineCoverage($baseline);
-
-        $status = Status::Pass;
-        $actions = null;
-
-        if ($coverage !== null && $coverage < $baselineCoverage) {
-            $status = Status::Fail;
-            $actions = [[
-                'type' => ActionType::AddTests,
-                'message' => sprintf('Coverage dropped from %.2f%% to %.2f%% — add more tests', $baselineCoverage, $coverage),
-                'files' => [],
-            ]];
-        }
+        [$status, $actions] = $this->evaluateCoverage($coverage, $baselineCoverage);
 
         $message = $coverage !== null
             ? sprintf('%.2f%% (baseline: %.2f%%)', $coverage, $baselineCoverage)
@@ -95,18 +87,7 @@ class CoverageGate implements GateInterface
 
         $coverage = $this->parseCoverageFromText($process->getOutput());
         $baselineCoverage = $this->getBaselineCoverage($baseline);
-
-        $status = Status::Pass;
-        $actions = null;
-
-        if ($coverage !== null && $coverage < $baselineCoverage) {
-            $status = Status::Fail;
-            $actions = [[
-                'type' => ActionType::AddTests,
-                'message' => sprintf('Coverage dropped from %.2f%% to %.2f%% — add more tests', $baselineCoverage, $coverage),
-                'files' => [],
-            ]];
-        }
+        [$status, $actions] = $this->evaluateCoverage($coverage, $baselineCoverage);
 
         $message = $coverage !== null
             ? sprintf('%.2f%% (baseline: %.2f%%)', $coverage, $baselineCoverage)
@@ -129,6 +110,23 @@ class CoverageGate implements GateInterface
         $val = $baseline->get('coverage', 'percentage', 85.0);
 
         return is_numeric($val) ? (float) $val : 85.0;
+    }
+
+    private function evaluateCoverage(?float $coverage, float $baselineCoverage): array
+    {
+        $status = Status::Pass;
+        $actions = null;
+
+        if ($coverage !== null && $coverage < $baselineCoverage) {
+            $status = Status::Fail;
+            $actions = [[
+                'type' => ActionType::AddTests,
+                'message' => sprintf('Coverage dropped from %.2f%% to %.2f%% — add more tests', $baselineCoverage, $coverage),
+                'files' => [],
+            ]];
+        }
+
+        return [$status, $actions];
     }
 
     private function parseClover(string $path): ?float

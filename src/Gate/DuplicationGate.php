@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class DuplicationGate implements GateInterface
@@ -41,8 +42,10 @@ class DuplicationGate implements GateInterface
 
     private function runJscpd(string $jscpd, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
-        @mkdir($tmpDir, 0755, true);
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
+        if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $tmpDir));
+        }
 
         $process = new Process([
             $jscpd,
@@ -63,8 +66,10 @@ class DuplicationGate implements GateInterface
 
     private function runJscpdViaNpx(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
-        @mkdir($tmpDir, 0755, true);
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
+        if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $tmpDir));
+        }
 
         $process = new Process([
             'npx', 'jscpd',
@@ -235,14 +240,8 @@ class DuplicationGate implements GateInterface
         if (! is_array($data)) {
             return null;
         }
-        $result = [];
-        foreach ($data as $key => $value) {
-            if (is_string($key)) {
-                $result[$key] = $value;
-            }
-        }
 
-        return $result;
+        return array_filter($data, static fn ($key) => is_string($key), ARRAY_FILTER_USE_KEY);
     }
 
     private function cleanup(string $dir): void

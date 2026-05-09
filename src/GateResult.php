@@ -56,7 +56,7 @@ readonly class GateResult
             $result['current'] = $this->current;
         }
         if ($this->actions !== null) {
-            $result['actions'] = array_map(fn (array $a): array => [
+            $result['actions'] = array_map(static fn (array $a): array => [
                 'type' => $a['type']->value,
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],

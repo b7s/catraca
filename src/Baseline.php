@@ -97,13 +97,6 @@ class Baseline
      */
     private function normalizeArray(array $data): array
     {
-        $result = [];
-        foreach ($data as $key => $value) {
-            if (is_string($key)) {
-                $result[$key] = $value;
-            }
-        }
-
-        return $result;
+        return array_filter($data, static fn ($key) => is_string($key), ARRAY_FILTER_USE_KEY);
     }
 }

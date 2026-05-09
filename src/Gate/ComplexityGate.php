@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class ComplexityGate implements GateInterface
@@ -30,8 +31,10 @@ class ComplexityGate implements GateInterface
             );
         }
 
-        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid();
-        @mkdir($tmpDir, 0755, true);
+        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
+        if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $tmpDir));
+        }
 
         $jsonPath = $tmpDir.'/phpmetrics.json';
 
@@ -105,11 +108,11 @@ class ComplexityGate implements GateInterface
                     count($violations),
                     $blockAt
                 ),
-                'files' => array_map(fn (array $v): string => $v['file'].':'.$v['method'].' (CCN '.$v['ccn'].')', $violations),
+                'files' => array_map(static fn (array $v): string => $v['file'].':'.$v['method'].' (CCN '.$v['ccn'].')', $violations),
             ]];
         }
 
-        $warnFiles = array_map(fn (array $w): string => $w['file'].':'.$w['method'].' (CCN '.$w['ccn'].')', $warnings);
+        $warnFiles = array_map(static fn (array $w): string => $w['file'].':'.$w['method'].' (CCN '.$w['ccn'].')', $warnings);
 
         return new GateResult(
             status: $status,

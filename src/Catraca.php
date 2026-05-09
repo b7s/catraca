@@ -10,6 +10,7 @@ use B7S\Catraca\Gate\FileSizeGate;
 use B7S\Catraca\Gate\SecurityGate;
 use B7S\Catraca\Gate\StaticAnalysisGate;
 use B7S\Catraca\Gate\StyleGate;
+use Throwable;
 
 class Catraca
 {
@@ -44,20 +45,7 @@ class Catraca
             $this->baseline->init();
         }
 
-        foreach ($this->gates as $gateDef) {
-            try {
-                $gateResult = $gateDef['gate']->run($this->baseline, $this->resolver);
-                $result->add($gateResult);
-            } catch (\Throwable $e) {
-                $result->add(new GateResult(
-                    status: Status::Skip,
-                    name: 'unknown',
-                    label: $gateDef['name'],
-                    message: 'Error: '.$e->getMessage(),
-                    details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
-                ));
-            }
-        }
+        $this->getDef($result);
 
         $this->writeBaseline($result);
 
@@ -72,20 +60,7 @@ class Catraca
 
         $result = new CheckResult;
 
-        foreach ($this->gates as $gateDef) {
-            try {
-                $gateResult = $gateDef['gate']->run($this->baseline, $this->resolver);
-                $result->add($gateResult);
-            } catch (\Throwable $e) {
-                $result->add(new GateResult(
-                    status: Status::Skip,
-                    name: 'unknown',
-                    label: $gateDef['name'],
-                    message: 'Error: '.$e->getMessage(),
-                    details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
-                ));
-            }
-        }
+        $this->getDef($result);
 
         return $result;
     }
@@ -99,5 +74,23 @@ class Catraca
             }
         }
         $this->baseline->write($data);
+    }
+
+    private function getDef(CheckResult $result): void
+    {
+        foreach ($this->gates as $gateDef) {
+            try {
+                $gateResult = $gateDef['gate']->run($this->baseline, $this->resolver);
+                $result->add($gateResult);
+            } catch (Throwable $e) {
+                $result->add(new GateResult(
+                    status: Status::Skip,
+                    name: 'unknown',
+                    label: $gateDef['name'],
+                    message: 'Error: '.$e->getMessage(),
+                    details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
+                ));
+            }
+        }
     }
 }

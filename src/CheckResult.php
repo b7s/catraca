@@ -3,6 +3,7 @@
 namespace B7S\Catraca;
 
 use B7S\Catraca\Enum\Status;
+use DateTimeInterface;
 
 class CheckResult
 {
@@ -58,17 +59,17 @@ class CheckResult
 
     public function getPassedCount(): int
     {
-        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->isPass()));
+        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->isPass()));
     }
 
     public function getFailedCount(): int
     {
-        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->isFail()));
+        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->isFail()));
     }
 
     public function getSkippedCount(): int
     {
-        return count(array_filter($this->gates, fn (GateResult $g): bool => $g->status === Status::Skip));
+        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->status === Status::Skip));
     }
 
     /**
@@ -79,15 +80,15 @@ class CheckResult
         return [
             'schema' => 'catraca/v1',
             'result' => $this->isPass() ? 'pass' : 'fail',
-            'timestamp' => $this->timestamp->format(\DateTimeInterface::ATOM),
+            'timestamp' => $this->timestamp->format(DateTimeInterface::ATOM),
             'summary' => [
                 'total' => count($this->gates),
                 'passed' => $this->getPassedCount(),
                 'failed' => $this->getFailedCount(),
                 'skipped' => $this->getSkippedCount(),
             ],
-            'gates' => array_map(fn (GateResult $g): array => $g->toArray(), $this->gates),
-            'actions' => array_map(fn (Action $a): array => $a->toArray(), $this->getActions()),
+            'gates' => array_map(static fn (GateResult $g): array => $g->toArray(), $this->gates),
+            'actions' => array_map(static fn (Action $a): array => $a->toArray(), $this->getActions()),
         ];
     }
 }
