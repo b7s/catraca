@@ -36,21 +36,34 @@ class FixCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $resolver = new ToolResolver($projectRoot);
         $fixed = 0;
+        $skipped = 0;
 
-        $fixed += $this->fixCodeStyle($resolver, $io);
-        $fixed += $this->fixPerformance($resolver, $io);
-        $fixed += $this->fixAutoload($resolver, $io);
+        $result = $this->fixCodeStyle($resolver, $io);
+        $fixed += $result['fixed'];
+        $skipped += $result['skipped'];
+
+        $result = $this->fixPerformance($resolver, $io);
+        $fixed += $result['fixed'];
+        $skipped += $result['skipped'];
+
+        $result = $this->fixAutoload($resolver, $io);
+        $fixed += $result['fixed'];
+        $skipped += $result['skipped'];
 
         if ($fixed > 0) {
             $io->success(sprintf('Fixed %d issue(s).', $fixed));
-        } else {
+        }
+        if ($skipped > 0) {
+            $io->note(sprintf('%d fixer(s) skipped (tool not installed).', $skipped));
+        }
+        if ($fixed === 0 && $skipped === 0) {
             $io->info('Nothing to fix.');
         }
 
         return Command::SUCCESS;
     }
 
-    private function fixCodeStyle(ToolResolver $resolver, SymfonyStyle $io): int
+    private function fixCodeStyle(ToolResolver $resolver, SymfonyStyle $io): array
     {
         $pint = $resolver->resolve('pint');
         if ($pint !== null) {
@@ -62,14 +75,18 @@ class FixCommand extends Command
             return $this->runFix('Code Style (php-cs-fixer)', [$resolver->resolvePhp(), $fixer, 'fix'], $io);
         }
 
-        return 0;
+        $io->text('  — Code Style: skipped (install pint or php-cs-fixer)');
+
+        return ['fixed' => 0, 'skipped' => 1];
     }
 
-    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io): int
+    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io): array
     {
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer === null) {
-            return 0;
+            $io->text('  — Performance: skipped (install php-cs-fixer)');
+
+            return ['fixed' => 0, 'skipped' => 1];
         }
 
         $rules = implode(',', [
@@ -86,16 +103,18 @@ class FixCommand extends Command
         );
     }
 
-    private function fixAutoload(ToolResolver $resolver, SymfonyStyle $io): int
+    private function fixAutoload(ToolResolver $resolver, SymfonyStyle $io): array
     {
         $composer = $resolver->resolve('composer');
         if ($composer === null) {
-            return 0;
+            $io->text('  — Autoload: skipped (composer not found)');
+
+            return ['fixed' => 0, 'skipped' => 1];
         }
 
         $autoloadFile = $resolver->getProjectRoot().'/vendor/composer/autoload_classmap.php';
         if (file_exists($autoloadFile)) {
-            return 0;
+            return ['fixed' => 0, 'skipped' => 0];
         }
 
         return $this->runFix(
@@ -105,7 +124,7 @@ class FixCommand extends Command
         );
     }
 
-    private function runFix(string $label, array $command, SymfonyStyle $io): int
+    private function runFix(string $label, array $command, SymfonyStyle $io): array
     {
         $io->text(sprintf('  <info>%s</info>...', $label));
 
@@ -115,11 +134,11 @@ class FixCommand extends Command
         if ($process->isSuccessful()) {
             $io->text(sprintf('  ✔ %s — done', $label));
 
-            return 1;
+            return ['fixed' => 1, 'skipped' => 0];
         }
 
         $io->text(sprintf('  ✘ %s — %s', $label, trim($process->getErrorOutput() ?: $process->getOutput())));
 
-        return 0;
+        return ['fixed' => 0, 'skipped' => 0];
     }
 }
