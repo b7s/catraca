@@ -34,10 +34,11 @@ composer require --dev phpunit/phpunit
 # or
 composer require --dev pestphp/pest
 
-# Duplication detection (requires Node.js)
-npm install --save-dev jscpd
-# or
-composer require --dev sebastian/phpcpd
+# Duplication detection
+# PHP 8.3
+composer require --dev systemsdk/phpcpd:^8.0
+# PHP 8.4+
+composer require --dev systemsdk/phpcpd:^9.0
 
 # Cyclomatic complexity
 composer require --dev phpmetrics/phpmetrics
@@ -62,7 +63,7 @@ Default baseline:
 | Code Style | 0 violations |
 | Static Analysis | 0 errors (level 5 if no `phpstan.neon`) |
 | Test Coverage | 85% minimum |
-| Duplication | 2% maximum |
+| Duplication | 2% maximum, min 3 lines, min 30 tokens |
 | File Size | 1000 lines maximum per file |
 | Complexity | Block at CCN 50, warn at CCN 20 |
 | Performance | 0 violations |
@@ -197,7 +198,7 @@ Gates run in order. A failure blocks the PR.
 | 2 | Code Style | `pint` or `php-cs-fixer` | 0 violations |
 | 3 | Static Analysis | `phpstan` or `psalm` | 0 errors (level 5 if no config) |
 | 4 | Test Coverage | `phpunit` or `pest` | 85% minimum |
-| 5 | Duplication | `jscpd` or `phpcpd` | 2% maximum |
+| 5 | Duplication | `phpcpd` | 2% maximum |
 | 6 | File Size | Built-in | 1000 lines per file |
 | 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
 | 8 | Performance | `php-cs-fixer` | 0 violations |

@@ -71,7 +71,7 @@ class Baseline
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
             'coverage' => ['percentage' => 85.0],
-            'duplication' => ['percentage' => 2.0, 'clones' => []],
+            'duplication' => ['percentage' => 2.0, 'clones' => [], 'min_lines' => 3, 'min_tokens' => 30],
             'file_size' => ['max_lines' => 1000],
             'complexity' => ['max_ccn' => 0],
         ]);
