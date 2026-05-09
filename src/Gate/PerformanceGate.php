@@ -20,33 +20,23 @@ class PerformanceGate implements GateInterface
         $messages = [];
         $hasTool = false;
 
-        $importResult = $this->checkGlobalImports($resolver);
-        if ($importResult !== null) {
-            $hasTool = true;
-            $violations += $importResult['violations'];
-            $files = array_merge($files, $importResult['files']);
-            if ($importResult['violations'] > 0) {
-                $messages[] = $importResult['message'];
-            }
-        }
+        $checks = [
+            $this->checkGlobalImports($resolver),
+            $this->checkUnusedImports($resolver),
+            $this->checkFullyQualifiedStrictTypes($resolver),
+            $this->checkLambdaNotUsedImport($resolver),
+            $this->checkAutoloadOptimization($resolver),
+        ];
 
-        $unusedResult = $this->checkUnusedImports($resolver);
-        if ($unusedResult !== null) {
-            $hasTool = true;
-            $violations += $unusedResult['violations'];
-            $files = array_merge($files, $unusedResult['files']);
-            if ($unusedResult['violations'] > 0) {
-                $messages[] = $unusedResult['message'];
+        foreach ($checks as $result) {
+            if ($result === null) {
+                continue;
             }
-        }
-
-        $autoloadResult = $this->checkAutoloadOptimization($resolver);
-        if ($autoloadResult !== null) {
             $hasTool = true;
-            $violations += $autoloadResult['violations'];
-            $files = array_merge($files, $autoloadResult['files']);
-            if ($autoloadResult['violations'] > 0) {
-                $messages[] = $autoloadResult['message'];
+            $violations += $result['violations'];
+            $files = array_merge($files, $result['files']);
+            if ($result['violations'] > 0) {
+                $messages[] = $result['message'];
             }
         }
 
@@ -108,6 +98,38 @@ class PerformanceGate implements GateInterface
             'violations' => $result['violations'],
             'files' => $result['files'],
             'message' => sprintf('%d files with unused imports', $result['violations']),
+        ];
+    }
+
+    private function checkFullyQualifiedStrictTypes(ToolResolver $resolver): ?array
+    {
+        $fixer = $resolver->resolve('php-cs-fixer');
+        if ($fixer === null) {
+            return null;
+        }
+
+        $result = $this->runCsFixerRule($fixer, $resolver, '{"fully_qualified_strict_types":{"import_symbols":true}}');
+
+        return [
+            'violations' => $result['violations'],
+            'files' => $result['files'],
+            'message' => sprintf('%d files with redundant FQCNs', $result['violations']),
+        ];
+    }
+
+    private function checkLambdaNotUsedImport(ToolResolver $resolver): ?array
+    {
+        $fixer = $resolver->resolve('php-cs-fixer');
+        if ($fixer === null) {
+            return null;
+        }
+
+        $result = $this->runCsFixerRule($fixer, $resolver, 'lambda_not_used_import');
+
+        return [
+            'violations' => $result['violations'],
+            'files' => $result['files'],
+            'message' => sprintf('%d closures with unused "use" variables', $result['violations']),
         ];
     }
 

@@ -183,6 +183,16 @@ Gates run in order. A failure blocks the PR.
 | 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
 | 8 | Performance | `php-cs-fixer` | 0 violations |
 
+The Performance gate runs 5 sub-checks:
+
+| Sub-check | Rule | What it detects |
+|-----------|------|-----------------|
+| Global imports | `global_namespace_import` | Missing `use class/function/const` statements |
+| Unused imports | `no_unused_imports` | Dead imports that slow parsing |
+| Redundant FQCNs | `fully_qualified_strict_types` | `\Foo\Bar` when `use Foo\Bar` already exists |
+| Unused closure `use` | `lambda_not_used_import` | Closures importing variables they don't use |
+| Autoload optimization | Built-in | Missing `composer dump-autoload -o` |
+
 ### PHPStan Configuration
 
 If your project has a `phpstan.neon`, `phpstan.neon.dist`, or `phpstan.dist.neon`, Catraca uses it as-is. If no config file exists, it defaults to **level 5**.
