@@ -3,13 +3,9 @@
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Catraca;
-use B7S\Catraca\Output\GithubFormatter;
-use B7S\Catraca\Output\HumanFormatter;
-use B7S\Catraca\Output\JsonFormatter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
@@ -22,10 +18,7 @@ class CheckCommand extends Command
 
     protected function configure(): void
     {
-        $this
-            ->addOption('path', 'p', InputOption::VALUE_REQUIRED, 'Project root path', getcwd())
-            ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: human, json, github', 'human')
-            ->addOption('plain', null, InputOption::VALUE_NONE, 'Plain text output (no ANSI colors)');
+        $this->addStandardOptions();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -35,21 +28,10 @@ class CheckCommand extends Command
             return Command::FAILURE;
         }
 
-        $format = $this->resolveFormat($input, $output);
-
         $catraca = new Catraca($projectRoot);
         $result = $catraca->check();
 
-        $formatted = match ($format) {
-            'json' => (new JsonFormatter)->format($result),
-            'github' => (new GithubFormatter)->format($result),
-            'human' => $this->isPlainOutput($input, $output)
-                ? (new HumanFormatter)->formatPlain($result)
-                : (new HumanFormatter)->format($result),
-            default => (new HumanFormatter)->format($result),
-        };
-
-        $output->write($formatted);
+        $this->formatResult($input, $output, $result);
 
         return $result->isPass() ? Command::SUCCESS : Command::FAILURE;
     }

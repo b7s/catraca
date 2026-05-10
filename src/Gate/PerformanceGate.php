@@ -3,6 +3,7 @@
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
+use B7S\Catraca\CsFixerResultParser;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
@@ -20,23 +21,36 @@ class PerformanceGate implements GateInterface
         $messages = [];
         $hasTool = false;
 
-        $checks = [
-            $this->checkGlobalImports($resolver),
-            $this->checkUnusedImports($resolver),
-            $this->checkFullyQualifiedStrictTypes($resolver),
-            $this->checkLambdaNotUsedImport($resolver),
-            $this->checkAutoloadOptimization($resolver),
-        ];
+        $enabledRules = $this->getEnabledRules($baseline);
+        $fixer = $resolver->resolve('php-cs-fixer');
 
-        foreach ($checks as $result) {
-            if ($result === null) {
-                continue;
+        if ($fixer !== null) {
+            foreach ($this->getRuleRegistry() as $key => $config) {
+                if (! ($enabledRules[$key] ?? false)) {
+                    continue;
+                }
+
+                $result = $this->runCsFixerRule($fixer, $resolver, $config['rule']);
+                $hasTool = true;
+                $violations += $result['violations'];
+
+                array_push($files, ...$result['files']);
+
+                if ($result['violations'] > 0) {
+                    $messages[] = sprintf($config['message'], $result['violations']);
+                }
             }
-            $hasTool = true;
-            $violations += $result['violations'];
-            $files = array_merge($files, $result['files']);
-            if ($result['violations'] > 0) {
-                $messages[] = $result['message'];
+        }
+
+        if ($enabledRules['autoload_optimization'] ?? true) {
+            $autoloadResult = $this->checkAutoloadOptimization($resolver);
+            if ($autoloadResult !== null) {
+                $hasTool = true;
+                $violations += $autoloadResult['violations'];
+                $files = array_merge($files, $autoloadResult['files']);
+                if ($autoloadResult['violations'] > 0) {
+                    $messages[] = $autoloadResult['message'];
+                }
             }
         }
 
@@ -69,68 +83,81 @@ class PerformanceGate implements GateInterface
         );
     }
 
-    private function checkGlobalImports(ToolResolver $resolver): ?array
+    /**
+     * @return array<string, array{rule: string, message: string}>
+     */
+    private function getRuleRegistry(): array
     {
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer === null) {
-            return null;
-        }
-
-        $result = $this->runCsFixerRule($fixer, $resolver, '{"global_namespace_import":{"import_classes":true,"import_constants":true,"import_functions":true}}');
-
         return [
-            'violations' => $result['violations'],
-            'files' => $result['files'],
-            'message' => sprintf('%d global imports missing (use class/function/const)', $result['violations']),
+            'global_namespace_import' => [
+                'rule' => '{"global_namespace_import":{"import_classes":true,"import_constants":true,"import_functions":true}}',
+                'message' => '%d global imports missing (use class/function/const)',
+            ],
+            'no_unused_imports' => [
+                'rule' => 'no_unused_imports',
+                'message' => '%d files with unused imports',
+            ],
+            'fully_qualified_strict_types' => [
+                'rule' => '{"fully_qualified_strict_types":{"import_symbols":true}}',
+                'message' => '%d files with redundant FQCNs',
+            ],
+            'lambda_not_used_import' => [
+                'rule' => 'lambda_not_used_import',
+                'message' => '%d closures with unused "use" variables',
+            ],
+            'native_function_invocation' => [
+                'rule' => '{"native_function_invocation":{"include":["@compiler_optimized"],"scope":"all","strict":true}}',
+                'message' => '%d native function calls without backslash prefix',
+            ],
+            'no_redundant_readonly_property' => [
+                'rule' => 'no_redundant_readonly_property',
+                'message' => '%d redundant readonly property declarations',
+            ],
+            'static_lambda' => [
+                'rule' => 'static_lambda',
+                'message' => '%d lambdas that should be declared static',
+            ],
+            'array_push' => [
+                'rule' => 'array_push',
+                'message' => '%d array_push() calls — use $arr[] = instead',
+            ],
+            'ereg_to_preg' => [
+                'rule' => 'ereg_to_preg',
+                'message' => '%d deprecated ereg function calls',
+            ],
+            'modernize_strpos' => [
+                'rule' => 'modernize_strpos',
+                'message' => '%d strpos() calls — use str_contains/str_starts_with/str_ends_with',
+            ],
+            'pow_to_exponentiation' => [
+                'rule' => 'pow_to_exponentiation',
+                'message' => '%d pow() calls — use ** operator instead',
+            ],
+            'random_api_migration' => [
+                'rule' => 'random_api_migration',
+                'message' => '%d rand()/mt_rand() calls — use random_int() instead',
+            ],
+            'set_type_to_cast' => [
+                'rule' => 'set_type_to_cast',
+                'message' => '%d settype() calls — use type casting instead',
+            ],
         ];
     }
 
-    private function checkUnusedImports(ToolResolver $resolver): ?array
+    /**
+     * @return array<string, bool>
+     */
+    private function getEnabledRules(Baseline $baseline): array
     {
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer === null) {
-            return null;
+        $rules = $baseline->get('performance', 'rules', []);
+        if (is_array($rules) && $rules !== []) {
+            return $rules;
         }
 
-        $result = $this->runCsFixerRule($fixer, $resolver, 'no_unused_imports');
+        $defaults = array_fill_keys(array_keys($this->getRuleRegistry()), true);
+        $defaults['autoload_optimization'] = true;
 
-        return [
-            'violations' => $result['violations'],
-            'files' => $result['files'],
-            'message' => sprintf('%d files with unused imports', $result['violations']),
-        ];
-    }
-
-    private function checkFullyQualifiedStrictTypes(ToolResolver $resolver): ?array
-    {
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer === null) {
-            return null;
-        }
-
-        $result = $this->runCsFixerRule($fixer, $resolver, '{"fully_qualified_strict_types":{"import_symbols":true}}');
-
-        return [
-            'violations' => $result['violations'],
-            'files' => $result['files'],
-            'message' => sprintf('%d files with redundant FQCNs', $result['violations']),
-        ];
-    }
-
-    private function checkLambdaNotUsedImport(ToolResolver $resolver): ?array
-    {
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer === null) {
-            return null;
-        }
-
-        $result = $this->runCsFixerRule($fixer, $resolver, 'lambda_not_used_import');
-
-        return [
-            'violations' => $result['violations'],
-            'files' => $result['files'],
-            'message' => sprintf('%d closures with unused "use" variables', $result['violations']),
-        ];
+        return $defaults;
     }
 
     private function runCsFixerRule(string $fixer, ToolResolver $resolver, string $rules): array
@@ -145,24 +172,12 @@ class PerformanceGate implements GateInterface
         ]);
         $process->run();
 
-        $output = $process->getOutput();
-        $violations = 0;
-        /** @var array<int, string> $files */
-        $files = [];
-
-        $data = json_decode($output, true);
-        if (is_array($data)) {
-            foreach ($data as $value) {
-                if (is_array($value) && isset($value['file']) && is_string($value['file'])) {
-                    $files[] = $value['file'];
-                }
-            }
-            $violations = count($files);
-        }
-
-        return ['violations' => $violations, 'files' => $files];
+        return CsFixerResultParser::parseJsonOutput($process->getOutput());
     }
 
+    /**
+     * @return array{violations: int, files: array<int, string>, message: string}|null
+     */
     private function checkAutoloadOptimization(ToolResolver $resolver): ?array
     {
         $composer = $resolver->resolve('composer');

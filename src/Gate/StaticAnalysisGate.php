@@ -96,33 +96,8 @@ class StaticAnalysisGate implements GateInterface
         }
 
         $errorCount = $totals['file_errors'] + $totals['errors'];
-        $baselineErrors = is_int($baseline->get('static_analysis', 'errors', 0))
-            ? $baseline->get('static_analysis', 'errors', 0)
-            : 0;
 
-        $status = Status::Pass;
-        $actions = null;
-
-        if ($errorCount > 0) {
-            $status = Status::Fail;
-            $actions = [[
-                'type' => ActionType::FixSA,
-                'message' => sprintf('Fix %d PHPStan errors', $errorCount),
-                'files' => array_slice($files, 0, 50),
-            ]];
-        }
-
-        return new GateResult(
-            status: $status,
-            name: 'static_analysis',
-            label: 'Static Analysis',
-            message: sprintf('%d errors (baseline: %d)', $errorCount, $baselineErrors),
-            severity: Severity::Block,
-            baseline: ['errors' => $baselineErrors],
-            current: ['errors' => $errorCount],
-            actions: $actions,
-            details: $errorCount > 0 ? ['errors' => array_slice($errors, 0, 100)] : null,
-        );
+        return $this->buildResult($errorCount, $errors, $files, $baseline, 'PHPStan');
     }
 
     private function runPsalm(string $psalm, Baseline $baseline, ToolResolver $resolver): GateResult
@@ -160,7 +135,15 @@ class StaticAnalysisGate implements GateInterface
             }
         }
 
-        $errorCount = count($errors);
+        return $this->buildResult(count($errors), $errors, $files, $baseline, 'Psalm');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $errors
+     * @param  array<int, string>  $files
+     */
+    private function buildResult(int $errorCount, array $errors, array $files, Baseline $baseline, string $toolName): GateResult
+    {
         $baselineErrors = is_int($baseline->get('static_analysis', 'errors', 0))
             ? $baseline->get('static_analysis', 'errors', 0)
             : 0;
@@ -172,7 +155,7 @@ class StaticAnalysisGate implements GateInterface
             $status = Status::Fail;
             $actions = [[
                 'type' => ActionType::FixSA,
-                'message' => sprintf('Fix %d Psalm errors', $errorCount),
+                'message' => sprintf('Fix %d %s errors', $errorCount, $toolName),
                 'files' => array_slice($files, 0, 50),
             ]];
         }

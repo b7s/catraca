@@ -3,6 +3,7 @@
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
+use B7S\Catraca\CsFixerResultParser;
 use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
@@ -75,20 +76,7 @@ class StyleGate implements GateInterface
             }
         }
 
-        $baselineViolations = $baseline->get('style', 'violations', 0);
-        [$status, $actions] = $this->evaluateStyleViolations($violations, $files);
-
-        return new GateResult(
-            status: $status,
-            name: 'style',
-            label: 'Code Style',
-            message: sprintf('%d violations (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0),
-            severity: Severity::Block,
-            baseline: ['violations' => $baselineViolations],
-            current: ['violations' => $violations],
-            actions: $actions,
-            details: $violations > 0 ? ['files' => $files] : null,
-        );
+        return $this->buildStyleResult($violations, $files, $baseline, $violations > 0 ? ['files' => $files] : null);
     }
 
     private function runCsFixer(string $fixer, Baseline $baseline, ToolResolver $resolver): GateResult
@@ -96,40 +84,18 @@ class StyleGate implements GateInterface
         $process = new Process([$resolver->resolvePhp(), $fixer, 'fix', '--dry-run', '--diff', '--format=json']);
         $process->run();
 
-        $output = $process->getOutput();
-        $violations = 0;
-        /** @var array<int, string> $files */
-        $files = [];
+        $result = CsFixerResultParser::parseJsonOutput($process->getOutput());
 
-        $data = json_decode($output, true);
-        if (is_array($data)) {
-            foreach ($data as $value) {
-                if (is_array($value) && isset($value['file']) && is_string($value['file'])) {
-                    $files[] = $value['file'];
-                }
-            }
-            $violations = count($files);
-        } elseif ($process->getExitCode() !== 0) {
-            $violations = substr_count($process->getOutput(), '1)') + substr_count($process->getOutput(), '2)');
+        if ($result['violations'] === 0 && $process->getExitCode() !== 0) {
+            $result['violations'] = substr_count($process->getOutput(), '1)') + substr_count($process->getOutput(), '2)');
         }
 
-        $baselineViolations = $baseline->get('style', 'violations', 0);
-        [$status, $actions] = $this->evaluateStyleViolations($violations, $files);
-
-        return new GateResult(
-            status: $status,
-            name: 'style',
-            label: 'Code Style',
-            message: sprintf('%d violations (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0),
-            severity: Severity::Block,
-            baseline: ['violations' => $baselineViolations],
-            current: ['violations' => $violations],
-            actions: $actions,
-        );
+        return $this->buildStyleResult($result['violations'], $result['files'], $baseline);
     }
 
-    private function evaluateStyleViolations(int $violations, array $files): array
+    private function buildStyleResult(int $violations, array $files, Baseline $baseline, ?array $details = null): GateResult
     {
+        $baselineViolations = $baseline->get('style', 'violations', 0);
         $status = Status::Pass;
         $actions = null;
 
@@ -142,6 +108,16 @@ class StyleGate implements GateInterface
             ]];
         }
 
-        return [$status, $actions];
+        return new GateResult(
+            status: $status,
+            name: 'style',
+            label: 'Code Style',
+            message: sprintf('%d violations (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0),
+            severity: Severity::Block,
+            baseline: ['violations' => $baselineViolations],
+            current: ['violations' => $violations],
+            actions: $actions,
+            details: $details,
+        );
     }
 }

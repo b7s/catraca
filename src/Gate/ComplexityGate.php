@@ -154,19 +154,7 @@ class ComplexityGate implements GateInterface
                 continue;
             }
             foreach ($methods as $methodName => $methodData) {
-                if (! is_array($methodData)) {
-                    continue;
-                }
-                $ccn = is_int($methodData['ccn'] ?? null) ? $methodData['ccn'] : 1;
-                if ($ccn > $maxCcn) {
-                    $maxCcn = $ccn;
-                }
-                $entry = ['file' => $fqcn, 'method' => is_string($methodName) ? $methodName : 'unknown', 'ccn' => $ccn];
-                if ($ccn >= self::BLOCK_AT) {
-                    $violations[] = $entry;
-                } elseif ($ccn >= self::WARN_AT) {
-                    $warnings[] = $entry;
-                }
+                $this->processMethod($fqcn, is_string($methodName) ? $methodName : 'unknown', $methodData, $violations, $warnings, $maxCcn);
             }
         }
     }
@@ -187,21 +175,30 @@ class ComplexityGate implements GateInterface
                 continue;
             }
             foreach ($methods as $method) {
-                if (! is_array($method)) {
-                    continue;
-                }
-                $ccn = is_int($method['ccn'] ?? null) ? $method['ccn'] : 1;
-                $name = is_string($method['name'] ?? null) ? $method['name'] : 'unknown';
-                if ($ccn > $maxCcn) {
-                    $maxCcn = $ccn;
-                }
-                $entry = ['file' => $filePath, 'method' => $name, 'ccn' => $ccn];
-                if ($ccn >= self::BLOCK_AT) {
-                    $violations[] = $entry;
-                } elseif ($ccn >= self::WARN_AT) {
-                    $warnings[] = $entry;
-                }
+                $name = is_array($method) && is_string($method['name'] ?? null) ? $method['name'] : 'unknown';
+                $this->processMethod($filePath, $name, is_array($method) ? $method : [], $violations, $warnings, $maxCcn);
             }
+        }
+    }
+
+    /**
+     * @param  array<int, array{file: string, method: string, ccn: int}>  $violations
+     * @param  array<int, array{file: string, method: string, ccn: int}>  $warnings
+     */
+    private function processMethod(string $file, string $name, mixed $methodData, array &$violations, array &$warnings, int &$maxCcn): void
+    {
+        if (! is_array($methodData)) {
+            return;
+        }
+        $ccn = is_int($methodData['ccn'] ?? null) ? $methodData['ccn'] : 1;
+        if ($ccn > $maxCcn) {
+            $maxCcn = $ccn;
+        }
+        $entry = ['file' => $file, 'method' => $name, 'ccn' => $ccn];
+        if ($ccn >= self::BLOCK_AT) {
+            $violations[] = $entry;
+        } elseif ($ccn >= self::WARN_AT) {
+            $warnings[] = $entry;
         }
     }
 
