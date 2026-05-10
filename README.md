@@ -107,7 +107,7 @@ What it fixes:
 | Fixer | Tool | What it does |
 |-------|------|--------------|
 | Code Style | `pint` or `php-cs-fixer` | Fixes all code style violations |
-| Performance | `php-cs-fixer` | Adds missing imports, removes unused imports, cleans FQCNs and closures |
+| Performance | `php-cs-fixer` | Adds missing imports, removes unused imports, cleans FQCNs, optimizes native calls and more |
 | Autoload | `composer` | Runs `composer dump-autoload -o` if not optimized |
 
 ### Exit Codes
@@ -203,15 +203,26 @@ Gates run in order. A failure blocks the PR.
 | 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
 | 8 | Performance | `php-cs-fixer` | 0 violations |
 
-The Performance gate runs 5 sub-checks:
+The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by default):
 
-| Sub-check | Rule | What it detects |
-|-----------|------|-----------------|
-| Global imports | `global_namespace_import` | Missing `use class/function/const` statements |
-| Unused imports | `no_unused_imports` | Dead imports that slow parsing |
-| Redundant FQCNs | `fully_qualified_strict_types` | `\Foo\Bar` when `use Foo\Bar` already exists |
-| Unused closure `use` | `lambda_not_used_import` | Closures importing variables they don't use |
-| Autoload optimization | Built-in | Missing `composer dump-autoload -o` |
+| Rule | What it detects |
+|------|-----------------|
+| `global_namespace_import` | Missing `use class/const` statements |
+| `no_unused_imports` | Dead imports that slow parsing |
+| `fully_qualified_strict_types` | `\Foo\Bar` when `use Foo\Bar` already exists |
+| `lambda_not_used_import` | Closures importing variables they don't use |
+| `native_function_invocation` | Native function calls without `\` prefix optimization |
+| `no_redundant_readonly_property` | Redundant readonly property declarations |
+| `static_lambda` | Lambdas not using `$this` that should be `static` |
+| `array_push` | `array_push()` calls — use `$arr[] =` instead |
+| `ereg_to_preg` | Deprecated `ereg` function calls |
+| `modernize_strpos` | `strpos()` calls — use `str_contains`/`str_starts_with`/`str_ends_with` |
+| `pow_to_exponentiation` | `pow()` calls — use `**` operator instead |
+| `random_api_migration` | `rand()`/`mt_rand()` calls — use `random_int()` instead |
+| `set_type_to_cast` | `settype()` calls — use type casting instead |
+| `autoload_optimization` | Missing `composer dump-autoload -o` |
+
+All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it.
 
 ### PHPStan Configuration
 
