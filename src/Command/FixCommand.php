@@ -43,11 +43,11 @@ class FixCommand extends Command
         $fixed = 0;
         $skipped = 0;
 
-        $result = $this->fixCodeStyle($resolver, $io);
+        $result = $this->fixPerformance($resolver, $io, $projectRoot);
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
-        $result = $this->fixPerformance($resolver, $io, $projectRoot);
+        $result = $this->fixCodeStyle($resolver, $io);
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
@@ -102,7 +102,7 @@ class FixCommand extends Command
 
         $baseline = new Baseline($projectRoot);
         $enabledRules = $baseline->get('performance', 'rules', []);
-        $rulesJson = $this->buildRulesJson($enabledRules);
+        $rulesJson = PerformanceGate::buildRulesJson($enabledRules);
 
         if ($rulesJson === '{}') {
             $io->text('  — Performance: no rules enabled');
@@ -161,30 +161,6 @@ class FixCommand extends Command
         $io->text(sprintf('  ✘ %s — %s', $label, trim($process->getErrorOutput() ?: $process->getOutput())));
 
         return ['fixed' => 0, 'skipped' => 0];
-    }
-
-    /**
-     * @param  array<string, mixed>  $enabledRules
-     */
-    private function buildRulesJson(array $enabledRules): string
-    {
-        $registry = PerformanceGate::getRuleRegistry();
-        $rules = [];
-        foreach ($registry as $key => $config) {
-            if (! ($enabledRules[$key] ?? false)) {
-                continue;
-            }
-            $decoded = json_decode($config['rule'], true);
-            if (is_array($decoded)) {
-                foreach ($decoded as $name => $cfg) {
-                    $rules[$name] = $cfg;
-                }
-            } else {
-                $rules[$config['rule']] = true;
-            }
-        }
-
-        return json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}';
     }
 
     /**

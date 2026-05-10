@@ -31,7 +31,7 @@ class PerformanceGate implements GateInterface
         $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
 
         if ($fixer !== null) {
-            $rulesJson = $this->buildRulesJson($enabledRules);
+            $rulesJson = self::buildRulesJson($enabledRules);
 
             if ($rulesJson !== '{}') {
                 $result = $this->runCsFixerRules($fixer, $resolver, $rulesJson, $paths);
@@ -148,25 +148,9 @@ class PerformanceGate implements GateInterface
     }
 
     /**
-     * @return array<string, bool>
-     */
-    private function getEnabledRules(Baseline $baseline): array
-    {
-        $rules = $baseline->get('performance', 'rules', []);
-        if (is_array($rules) && $rules !== []) {
-            return $rules;
-        }
-
-        $defaults = array_fill_keys(array_keys(self::getRuleRegistry()), true);
-        $defaults['autoload_optimization'] = true;
-
-        return $defaults;
-    }
-
-    /**
      * @param  array<string, mixed>  $enabledRules
      */
-    private function buildRulesJson(array $enabledRules): string
+    public static function buildRulesJson(array $enabledRules): string
     {
         $registry = self::getRuleRegistry();
         $rules = [];
@@ -185,6 +169,22 @@ class PerformanceGate implements GateInterface
         }
 
         return json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}';
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function getEnabledRules(Baseline $baseline): array
+    {
+        $rules = $baseline->get('performance', 'rules', []);
+        if (is_array($rules) && $rules !== []) {
+            return $rules;
+        }
+
+        $defaults = array_fill_keys(array_keys(self::getRuleRegistry()), true);
+        $defaults['autoload_optimization'] = true;
+
+        return $defaults;
     }
 
     private function runCsFixerRules(string $fixer, ToolResolver $resolver, string $rulesJson, array $paths): array
