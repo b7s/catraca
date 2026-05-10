@@ -50,7 +50,7 @@ Any tool not installed is **skipped** (not failed). Security audit uses `compose
 
 ### `catraca init` — Initialize baseline
 
-Creates `baseline.json` in your project root with default thresholds:
+Creates `catraca_baseline.json` in your project root with default thresholds:
 
 ```bash
 vendor/bin/catraca init
@@ -68,11 +68,11 @@ Default baseline:
 | Complexity | Block at CCN 50, warn at CCN 20 |
 | Performance | 0 violations |
 
-You can edit `baseline.json` directly to adjust thresholds.
+You can edit `catraca_baseline.json` directly to adjust thresholds.
 
 ### `catraca check` — Run quality gates
 
-Runs all 8 gates and compares against baseline. If `baseline.json` doesn't exist, it is created automatically.
+Runs all 8 gates and compares against baseline. If `catraca_baseline.json` doesn't exist, it is created automatically.
 
 ```bash
 # Human-readable (default)

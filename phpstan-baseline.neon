@@ -1,13 +1,2 @@
 parameters:
 	ignoreErrors:
-		-
-			message: '#^Method B7S\\Catraca\\Gate\\PerformanceGate\:\:test\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: src/Gate/PerformanceGate.php
-
-		-
-			message: '#^Method B7S\\Catraca\\Gate\\SecurityGate\:\:test\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: src/Gate/SecurityGate.php

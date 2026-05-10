@@ -2,11 +2,13 @@
 
 namespace B7S\Catraca;
 
+use DateTimeImmutable;
+
 class Baseline
 {
-    private const FILENAME = 'baseline.json';
+    private const string FILENAME = 'catraca_baseline.json';
 
-    private const SCHEMA = 'catraca/v1';
+    private const string SCHEMA = 'catraca/v1';
 
     public readonly string $projectRoot;
 
@@ -53,7 +55,7 @@ class Baseline
     public function write(array $data): void
     {
         $data['schema'] = self::SCHEMA;
-        $data['updated_at'] = (new \DateTimeImmutable)->format(\DateTimeInterface::ATOM);
+        $data['updated_at'] = (new DateTimeImmutable)->format(\DateTimeInterface::ATOM);
 
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
@@ -66,7 +68,7 @@ class Baseline
     {
         $this->write([
             'schema' => self::SCHEMA,
-            'created_at' => (new \DateTimeImmutable)->format(\DateTimeInterface::ATOM),
+            'created_at' => (new DateTimeImmutable)->format(\DateTimeInterface::ATOM),
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
@@ -92,7 +94,6 @@ class Baseline
     }
 
     /**
-     * @param  array<mixed, mixed>  $data
      * @return array<string, mixed>
      */
     private function normalizeArray(array $data): array

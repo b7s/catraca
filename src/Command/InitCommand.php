@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
     name: 'init',
-    description: 'Initialize baseline.json with current metrics',
+    description: 'Initialize catraca_baseline.json with current metrics',
 )]
 class InitCommand extends Command
 {
@@ -52,7 +52,7 @@ class InitCommand extends Command
         $output->write($formatted);
 
         $output->writeln('');
-        $output->writeln(sprintf('<info>Baseline written to %s/baseline.json</info>', $projectRoot));
+        $output->writeln(sprintf('<info>Baseline written to %s/catraca_baseline.json</info>', $projectRoot));
 
         return Command::SUCCESS;
     }
