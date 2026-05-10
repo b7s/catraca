@@ -167,6 +167,7 @@ class PerformanceGate implements GateInterface
             'fix',
             '--dry-run',
             '--diff',
+            '--allow-risky=yes',
             '--format=json',
             '--rules='.$rules,
         ]);
