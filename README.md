@@ -135,8 +135,9 @@ Terminal-friendly output with ANSI colors:
   ✘ Duplication             FAIL     5.20% (baseline: 2.00%, 2 clones)
   ✔ File Size               PASS     0 files exceed 1000 lines
   ✔ Cyclomatic Complexity   PASS     max CCN 8, 0 violations (>50), 1 warnings (>20)
+  ✔ Performance             PASS     No performance improvements needed
   ────────────────────────────────────────────────────────────
-  RESULT: FAIL — 5/7 gates passed
+  RESULT: FAIL — 6/8 gates passed
 
   ┌──────────────────────────────────┐
   │ Required Actions                 │
@@ -222,7 +223,7 @@ The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by
 | `set_type_to_cast` | `settype()` calls — use type casting instead |
 | `autoload_optimization` | Missing `composer dump-autoload -o` |
 
-All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it.
+All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it. Add new rules if needed.
 
 ### PHPStan Configuration
 
