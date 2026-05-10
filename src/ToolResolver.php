@@ -2,6 +2,11 @@
 
 namespace B7S\Catraca;
 
+use RuntimeException;
+
+use function is_string;
+use function sprintf;
+
 class ToolResolver
 {
     public function __construct(
@@ -34,7 +39,7 @@ class ToolResolver
     {
         $resolved = $this->resolve($tool);
         if ($resolved === null) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 sprintf('Tool "%s" not found. Install it locally (composer require --dev), globally (composer global require), or as a standalone PHAR.', $tool)
             );
         }

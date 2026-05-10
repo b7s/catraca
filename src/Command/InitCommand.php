@@ -8,6 +8,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
+use function sprintf;
+
 #[AsCommand(
     name: 'init',
     description: 'Initialize catraca_baseline.json with current metrics',

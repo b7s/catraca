@@ -12,6 +12,8 @@ use B7S\Catraca\ToolResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+use function sprintf;
+
 class CoverageGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult

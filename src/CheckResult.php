@@ -3,7 +3,10 @@
 namespace B7S\Catraca;
 
 use B7S\Catraca\Enum\Status;
+use DateTimeImmutable;
 use DateTimeInterface;
+
+use function count;
 
 class CheckResult
 {
@@ -11,7 +14,7 @@ class CheckResult
     private array $gates = [];
 
     public function __construct(
-        public readonly \DateTimeImmutable $timestamp = new \DateTimeImmutable,
+        public readonly DateTimeImmutable $timestamp = new DateTimeImmutable,
     ) {}
 
     public function add(GateResult $gate): void

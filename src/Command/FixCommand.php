@@ -2,6 +2,8 @@
 
 namespace B7S\Catraca\Command;
 
+use B7S\Catraca\Baseline;
+use B7S\Catraca\Gate\PerformanceGate;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -10,6 +12,9 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
+
+use function is_array;
+use function sprintf;
 
 #[AsCommand(
     name: 'fix',
@@ -42,7 +47,7 @@ class FixCommand extends Command
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
-        $result = $this->fixPerformance($resolver, $io);
+        $result = $this->fixPerformance($resolver, $io, $projectRoot);
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
@@ -72,7 +77,13 @@ class FixCommand extends Command
 
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer !== null) {
-            return $this->runFix('Code Style (php-cs-fixer)', [$resolver->resolvePhp(), $fixer, 'fix'], $io);
+            $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
+            $cmd = [$resolver->resolvePhp(), $fixer, 'fix'];
+            foreach ($paths as $path) {
+                $cmd[] = $path;
+            }
+
+            return $this->runFix('Code Style (php-cs-fixer)', $cmd, $io);
         }
 
         $io->text('  — Code Style: skipped (install pint or php-cs-fixer)');
@@ -80,7 +91,7 @@ class FixCommand extends Command
         return ['fixed' => 0, 'skipped' => 1];
     }
 
-    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io): array
+    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io, string $projectRoot): array
     {
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer === null) {
@@ -89,18 +100,28 @@ class FixCommand extends Command
             return ['fixed' => 0, 'skipped' => 1];
         }
 
-        $rules = implode(',', [
-            'global_namespace_import',
-            'no_unused_imports',
-            'fully_qualified_strict_types',
-            'lambda_not_used_import',
-        ]);
+        $baseline = new Baseline($projectRoot);
+        $enabledRules = $baseline->get('performance', 'rules', []);
+        $rulesJson = $this->buildRulesJson($enabledRules);
 
-        return $this->runFix(
-            'Performance (php-cs-fixer)',
-            [$resolver->resolvePhp(), $fixer, 'fix', '--rules='.$rules],
-            $io,
-        );
+        if ($rulesJson === '{}') {
+            $io->text('  — Performance: no rules enabled');
+
+            return ['fixed' => 0, 'skipped' => 0];
+        }
+
+        $paths = $this->resolveSourcePaths($projectRoot);
+        $cmd = [
+            $resolver->resolvePhp(), $fixer, 'fix',
+            '--allow-risky=yes',
+            '--using-cache=no',
+            '--rules='.$rulesJson,
+        ];
+        foreach ($paths as $path) {
+            $cmd[] = $path;
+        }
+
+        return $this->runFix('Performance (php-cs-fixer)', $cmd, $io);
     }
 
     private function fixAutoload(ToolResolver $resolver, SymfonyStyle $io): array
@@ -140,5 +161,44 @@ class FixCommand extends Command
         $io->text(sprintf('  ✘ %s — %s', $label, trim($process->getErrorOutput() ?: $process->getOutput())));
 
         return ['fixed' => 0, 'skipped' => 0];
+    }
+
+    /**
+     * @param  array<string, mixed>  $enabledRules
+     */
+    private function buildRulesJson(array $enabledRules): string
+    {
+        $registry = PerformanceGate::getRuleRegistry();
+        $rules = [];
+        foreach ($registry as $key => $config) {
+            if (! ($enabledRules[$key] ?? false)) {
+                continue;
+            }
+            $decoded = json_decode($config['rule'], true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $name => $cfg) {
+                    $rules[$name] = $cfg;
+                }
+            } else {
+                $rules[$config['rule']] = true;
+            }
+        }
+
+        return json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveSourcePaths(string $projectRoot): array
+    {
+        $paths = [];
+        foreach (['src', 'app', 'lib'] as $dir) {
+            if (is_dir($projectRoot.'/'.$dir)) {
+                $paths[] = $projectRoot.'/'.$dir;
+            }
+        }
+
+        return $paths !== [] ? $paths : [$projectRoot];
     }
 }

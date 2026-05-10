@@ -3,6 +3,10 @@
 namespace B7S\Catraca;
 
 use DateTimeImmutable;
+use DateTimeInterface;
+
+use function is_array;
+use function is_string;
 
 class Baseline
 {
@@ -55,7 +59,7 @@ class Baseline
     public function write(array $data): void
     {
         $data['schema'] = self::SCHEMA;
-        $data['updated_at'] = (new DateTimeImmutable)->format(\DateTimeInterface::ATOM);
+        $data['updated_at'] = (new DateTimeImmutable)->format(DateTimeInterface::ATOM);
 
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
@@ -68,7 +72,7 @@ class Baseline
     {
         $this->write([
             'schema' => self::SCHEMA,
-            'created_at' => (new DateTimeImmutable)->format(\DateTimeInterface::ATOM),
+            'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ATOM),
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],

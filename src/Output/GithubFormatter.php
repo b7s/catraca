@@ -6,6 +6,13 @@ use B7S\Catraca\CheckResult;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateResult;
 
+use function array_slice;
+use function count;
+use function is_array;
+use function is_int;
+use function is_string;
+use function sprintf;
+
 class GithubFormatter
 {
     public function format(CheckResult $result): string

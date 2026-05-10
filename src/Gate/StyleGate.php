@@ -12,6 +12,13 @@ use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
+use function array_slice;
+use function count;
+use function is_array;
+use function is_int;
+use function is_string;
+use function sprintf;
+
 class StyleGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
@@ -81,7 +88,13 @@ class StyleGate implements GateInterface
 
     private function runCsFixer(string $fixer, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $process = new Process([$resolver->resolvePhp(), $fixer, 'fix', '--dry-run', '--diff', '--format=json']);
+        $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
+        $cmd = [$resolver->resolvePhp(), $fixer, 'fix', '--dry-run', '--diff', '--format=json'];
+        foreach ($paths as $path) {
+            $cmd[] = $path;
+        }
+
+        $process = new Process($cmd);
         $process->run();
 
         $result = CsFixerResultParser::parseJsonOutput($process->getOutput());
@@ -119,5 +132,20 @@ class StyleGate implements GateInterface
             actions: $actions,
             details: $details,
         );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveSourcePaths(string $projectRoot): array
+    {
+        $paths = [];
+        foreach (['src', 'app', 'lib'] as $dir) {
+            if (is_dir($projectRoot.'/'.$dir)) {
+                $paths[] = $projectRoot.'/'.$dir;
+            }
+        }
+
+        return $paths !== [] ? $paths : [$projectRoot];
     }
 }

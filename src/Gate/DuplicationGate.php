@@ -11,6 +11,12 @@ use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
+use function array_slice;
+use function count;
+use function is_int;
+use function sprintf;
+use function strlen;
+
 class DuplicationGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult

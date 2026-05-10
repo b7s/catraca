@@ -12,6 +12,13 @@ use B7S\Catraca\ToolResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+use function array_slice;
+use function count;
+use function is_array;
+use function is_int;
+use function is_string;
+use function sprintf;
+
 class ComplexityGate implements GateInterface
 {
     private const BLOCK_AT = 50;

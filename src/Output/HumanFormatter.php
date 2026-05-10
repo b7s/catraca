@@ -7,6 +7,10 @@ use B7S\Catraca\CheckResult;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateResult;
 
+use function array_slice;
+use function count;
+use function sprintf;
+
 class HumanFormatter
 {
     public function format(CheckResult $result): string

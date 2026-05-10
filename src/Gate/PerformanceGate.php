@@ -12,6 +12,11 @@ use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
+use function array_slice;
+use function is_array;
+use function is_int;
+use function sprintf;
+
 class PerformanceGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
@@ -23,21 +28,19 @@ class PerformanceGate implements GateInterface
 
         $enabledRules = $this->getEnabledRules($baseline);
         $fixer = $resolver->resolve('php-cs-fixer');
+        $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
 
         if ($fixer !== null) {
-            foreach ($this->getRuleRegistry() as $key => $config) {
-                if (! ($enabledRules[$key] ?? false)) {
-                    continue;
-                }
+            $rulesJson = $this->buildRulesJson($enabledRules);
 
-                $result = $this->runCsFixerRule($fixer, $resolver, $config['rule']);
+            if ($rulesJson !== '{}') {
+                $result = $this->runCsFixerRules($fixer, $resolver, $rulesJson, $paths);
                 $hasTool = true;
-                $violations += $result['violations'];
+                $violations = $result['violations'];
+                $files = $result['files'];
 
-                array_push($files, ...$result['files']);
-
-                if ($result['violations'] > 0) {
-                    $messages[] = sprintf($config['message'], $result['violations']);
+                if ($violations > 0) {
+                    $messages[] = sprintf('%d files with performance improvements available', $violations);
                 }
             }
         }
@@ -86,7 +89,7 @@ class PerformanceGate implements GateInterface
     /**
      * @return array<string, array{rule: string, message: string}>
      */
-    private function getRuleRegistry(): array
+    public static function getRuleRegistry(): array
     {
         return [
             'global_namespace_import' => [
@@ -154,26 +157,71 @@ class PerformanceGate implements GateInterface
             return $rules;
         }
 
-        $defaults = array_fill_keys(array_keys($this->getRuleRegistry()), true);
+        $defaults = array_fill_keys(array_keys(self::getRuleRegistry()), true);
         $defaults['autoload_optimization'] = true;
 
         return $defaults;
     }
 
-    private function runCsFixerRule(string $fixer, ToolResolver $resolver, string $rules): array
+    /**
+     * @param  array<string, mixed>  $enabledRules
+     */
+    private function buildRulesJson(array $enabledRules): string
     {
-        $process = new Process([
+        $registry = self::getRuleRegistry();
+        $rules = [];
+        foreach ($registry as $key => $config) {
+            if (! ($enabledRules[$key] ?? false)) {
+                continue;
+            }
+            $decoded = json_decode($config['rule'], true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $name => $cfg) {
+                    $rules[$name] = $cfg;
+                }
+            } else {
+                $rules[$config['rule']] = true;
+            }
+        }
+
+        return json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}';
+    }
+
+    private function runCsFixerRules(string $fixer, ToolResolver $resolver, string $rulesJson, array $paths): array
+    {
+        $cmd = [
             $resolver->resolvePhp(), $fixer,
             'fix',
             '--dry-run',
             '--diff',
             '--allow-risky=yes',
+            '--using-cache=no',
             '--format=json',
-            '--rules='.$rules,
-        ]);
+            '--rules='.$rulesJson,
+        ];
+        foreach ($paths as $path) {
+            $cmd[] = $path;
+        }
+
+        $process = new Process($cmd);
         $process->run();
 
         return CsFixerResultParser::parseJsonOutput($process->getOutput());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveSourcePaths(string $projectRoot): array
+    {
+        $paths = [];
+        foreach (['src', 'app', 'lib'] as $dir) {
+            if (is_dir($projectRoot.'/'.$dir)) {
+                $paths[] = $projectRoot.'/'.$dir;
+            }
+        }
+
+        return $paths !== [] ? $paths : [$projectRoot];
     }
 
     /**

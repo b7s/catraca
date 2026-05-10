@@ -11,6 +11,12 @@ use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
+use function count;
+use function in_array;
+use function is_array;
+use function is_string;
+use function sprintf;
+
 class SecurityGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult

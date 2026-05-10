@@ -13,6 +13,8 @@ use B7S\Catraca\Gate\StaticAnalysisGate;
 use B7S\Catraca\Gate\StyleGate;
 use Throwable;
 
+use function get_class;
+
 class Catraca
 {
     private Baseline $baseline;
