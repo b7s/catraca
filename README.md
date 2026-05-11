@@ -58,8 +58,9 @@ vendor/bin/catraca init
 
 Default baseline:
 
-| Gate | Default |
-|------|---------|
+| Setting | Default |
+|---------|---------|
+| Source Dirs | `["src", "app", "lib"]` |
 | Code Style | 0 violations |
 | Static Analysis | 0 errors (level 5 if no `phpstan.neon`) |
 | Test Coverage | 85% minimum |
@@ -69,6 +70,60 @@ Default baseline:
 | Performance | 0 violations |
 
 You can edit `catraca_baseline.json` directly to adjust thresholds.
+
+### Configuration — `catraca_baseline.json`
+
+```json
+{
+    "source_dirs": {
+        "paths": ["src", "app", "lib"]
+    },
+    "security": {
+        "advisories": 0
+    },
+    "style": {
+        "violations": 0
+    },
+    "static_analysis": {
+        "errors": 0
+    },
+    "coverage": {
+        "percentage": 85.0
+    },
+    "duplication": {
+        "percentage": 2.0,
+        "min_lines": 3,
+        "min_tokens": 30
+    },
+    "file_size": {
+        "max_lines": 1000
+    },
+    "complexity": {
+        "max_ccn": 0
+    },
+    "performance": {
+        "violations": 0,
+        "rules": {
+            "global_namespace_import": true,
+            "no_unused_imports": true,
+            "fully_qualified_strict_types": true,
+            "lambda_not_used_import": true,
+            "native_function_invocation": true,
+            "no_redundant_readonly_property": true,
+            "static_lambda": true,
+            "array_push": true,
+            "ereg_to_preg": true,
+            "modernize_strpos": true,
+            "pow_to_exponentiation": true,
+            "random_api_migration": true,
+            "set_type_to_cast": true,
+            "autoload_optimization": true
+        }
+    }
+}
+```
+
+**`source_dirs.paths`** — which directories Catraca scans for PHP files. Only directories that exist on disk are used. If none of the configured directories exist, the project root is used as fallback. Defaults to `["src", "app", "lib"]`.
 
 ### `catraca check` — Run quality gates
 
