@@ -28,7 +28,8 @@ class PerformanceGate implements GateInterface
 
         $enabledRules = $this->getEnabledRules($baseline);
         $fixer = $resolver->resolve('php-cs-fixer');
-        $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
+        $sourceDirs = $baseline->getSourceDirs();
+        $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $sourceDirs);
 
         if ($fixer !== null) {
             $rulesJson = self::buildRulesJson($enabledRules);
@@ -210,12 +211,13 @@ class PerformanceGate implements GateInterface
     }
 
     /**
+     * @param  array<int, string>  $sourceDirs
      * @return array<int, string>
      */
-    private function resolveSourcePaths(string $projectRoot): array
+    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
     {
         $paths = [];
-        foreach (['src', 'app', 'lib'] as $dir) {
+        foreach ($sourceDirs as $dir) {
             if (is_dir($projectRoot.'/'.$dir)) {
                 $paths[] = $projectRoot.'/'.$dir;
             }

@@ -16,6 +16,8 @@ class Baseline
 
     public readonly string $projectRoot;
 
+    private const array DEFAULT_SOURCE_DIRS = ['src', 'app', 'lib'];
+
     public function __construct(string $projectRoot)
     {
         $this->projectRoot = $projectRoot;
@@ -73,6 +75,7 @@ class Baseline
         $this->write([
             'schema' => self::SCHEMA,
             'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ATOM),
+            'source_dirs' => ['paths' => self::DEFAULT_SOURCE_DIRS],
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
@@ -97,6 +100,19 @@ class Baseline
             'file_size' => ['max_lines' => 1000],
             'complexity' => ['max_ccn' => 0],
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getSourceDirs(): array
+    {
+        $dirs = $this->get('source_dirs', 'paths', null);
+        if (is_array($dirs) && $dirs !== []) {
+            return $dirs;
+        }
+
+        return self::DEFAULT_SOURCE_DIRS;
     }
 
     public function get(string $gate, string $key, mixed $default = null): mixed

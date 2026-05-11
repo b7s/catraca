@@ -88,7 +88,7 @@ class StyleGate implements GateInterface
 
     private function runCsFixer(string $fixer, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
+        $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $baseline->getSourceDirs());
         $cmd = [$resolver->resolvePhp(), $fixer, 'fix', '--dry-run', '--diff', '--format=json'];
         foreach ($paths as $path) {
             $cmd[] = $path;
@@ -135,12 +135,13 @@ class StyleGate implements GateInterface
     }
 
     /**
+     * @param  array<int, string>  $sourceDirs
      * @return array<int, string>
      */
-    private function resolveSourcePaths(string $projectRoot): array
+    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
     {
         $paths = [];
-        foreach (['src', 'app', 'lib'] as $dir) {
+        foreach ($sourceDirs as $dir) {
             if (is_dir($projectRoot.'/'.$dir)) {
                 $paths[] = $projectRoot.'/'.$dir;
             }

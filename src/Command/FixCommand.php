@@ -39,14 +39,16 @@ class FixCommand extends Command
 
         $io = new SymfonyStyle($input, $output);
         $resolver = new ToolResolver($projectRoot);
+        $baseline = new Baseline($projectRoot);
+        $sourceDirs = $baseline->getSourceDirs();
         $fixed = 0;
         $skipped = 0;
 
-        $result = $this->fixPerformance($resolver, $io, $projectRoot);
+        $result = $this->fixPerformance($resolver, $io, $projectRoot, $sourceDirs);
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
-        $result = $this->fixCodeStyle($resolver, $io);
+        $result = $this->fixCodeStyle($resolver, $io, $sourceDirs);
         $fixed += $result['fixed'];
         $skipped += $result['skipped'];
 
@@ -67,7 +69,7 @@ class FixCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function fixCodeStyle(ToolResolver $resolver, SymfonyStyle $io): array
+    private function fixCodeStyle(ToolResolver $resolver, SymfonyStyle $io, array $sourceDirs): array
     {
         $pint = $resolver->resolve('pint');
         if ($pint !== null) {
@@ -76,7 +78,7 @@ class FixCommand extends Command
 
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer !== null) {
-            $paths = $this->resolveSourcePaths($resolver->getProjectRoot());
+            $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $sourceDirs);
             $cmd = [$resolver->resolvePhp(), $fixer, 'fix'];
             foreach ($paths as $path) {
                 $cmd[] = $path;
@@ -90,7 +92,7 @@ class FixCommand extends Command
         return ['fixed' => 0, 'skipped' => 1];
     }
 
-    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io, string $projectRoot): array
+    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io, string $projectRoot, array $sourceDirs): array
     {
         $fixer = $resolver->resolve('php-cs-fixer');
         if ($fixer === null) {
@@ -109,7 +111,7 @@ class FixCommand extends Command
             return ['fixed' => 0, 'skipped' => 0];
         }
 
-        $paths = $this->resolveSourcePaths($projectRoot);
+        $paths = $this->resolveSourcePaths($projectRoot, $sourceDirs);
         $cmd = [
             $resolver->resolvePhp(), $fixer, 'fix',
             '--allow-risky=yes',
@@ -163,12 +165,13 @@ class FixCommand extends Command
     }
 
     /**
+     * @param  array<int, string>  $sourceDirs
      * @return array<int, string>
      */
-    private function resolveSourcePaths(string $projectRoot): array
+    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
     {
         $paths = [];
-        foreach (['src', 'app', 'lib'] as $dir) {
+        foreach ($sourceDirs as $dir) {
             if (is_dir($projectRoot.'/'.$dir)) {
                 $paths[] = $projectRoot.'/'.$dir;
             }
