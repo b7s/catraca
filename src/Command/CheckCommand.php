@@ -3,6 +3,7 @@
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Catraca;
+use JsonException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -21,6 +22,9 @@ class CheckCommand extends Command
         $this->addStandardOptions();
     }
 
+    /**
+     * @throws JsonException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->resolveProjectRoot($input, $output);

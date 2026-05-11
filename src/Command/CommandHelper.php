@@ -6,6 +6,7 @@ use B7S\Catraca\CheckResult;
 use B7S\Catraca\Output\GithubFormatter;
 use B7S\Catraca\Output\HumanFormatter;
 use B7S\Catraca\Output\JsonFormatter;
+use JsonException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -50,12 +51,16 @@ trait CommandHelper
         return $input->getOption('plain') || ! $output->isDecorated();
     }
 
+    /**
+     * @throws JsonException
+     */
     private function formatResult(InputInterface $input, OutputInterface $output, CheckResult $result): void
     {
         $format = $this->resolveFormat($input, $output);
 
         $formatted = match ($format) {
             'json' => (new JsonFormatter)->format($result),
+            'json-pretty' => (new JsonFormatter)->format($result, true),
             'github' => (new GithubFormatter)->format($result),
             'human' => $this->isPlainOutput($input, $output)
                 ? (new HumanFormatter)->formatPlain($result)

@@ -138,6 +138,7 @@ vendor/bin/catraca check --plain
 
 # JSON output for AI agents / CI
 vendor/bin/catraca check --format=json
+# or vendor/bin/catraca check --format=json-pretty
 
 # GitHub Actions annotations
 vendor/bin/catraca check --format=github
@@ -206,6 +207,9 @@ Terminal-friendly output with ANSI colors:
 ```
 
 ### JSON (for AI agents)
+
+Use `catraca check --format=json` to get structured JSON output for AI agents.
+If you want it formatted, use `catraca check --format=json-pretty`. Note: Consumes more AI agent tokens.
 
 ```json
 {
