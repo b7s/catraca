@@ -14,6 +14,6 @@ class JsonFormatter
     {
         $encoded = json_encode($result->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($asPretty ? JSON_PRETTY_PRINT : 0));
 
-        return ($encoded !== false ? $encoded : '{}')."\n";
+        return $encoded."\n";
     }
 }

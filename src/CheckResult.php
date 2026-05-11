@@ -7,6 +7,8 @@ use DateTimeImmutable;
 use DateTimeInterface;
 
 use function count;
+use function is_array;
+use function is_string;
 
 class CheckResult
 {
@@ -47,17 +49,54 @@ class CheckResult
             if ($gate->actions === null) {
                 continue;
             }
+            $reasons = $this->extractReasons($gate->details);
             foreach ($gate->actions as $actionData) {
                 $actions[] = new Action(
                     type: $actionData['type'],
                     message: $actionData['message'],
                     files: $actionData['files'] ?? [],
                     priority: count($actions),
+                    reasons: $reasons,
                 );
             }
         }
 
         return $actions;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $details
+     * @return array<int, string>
+     */
+    private function extractReasons(?array $details): array
+    {
+        if ($details === null) {
+            return [];
+        }
+
+        $reasons = [];
+
+        foreach (['errors', 'clones', 'oversized'] as $key) {
+            $items = $details[$key] ?? null;
+            if (! is_array($items)) {
+                continue;
+            }
+            foreach ($items as $item) {
+                if (is_array($item) && isset($item['message']) && is_string($item['message'])) {
+                    $reasons[] = $item['message'];
+                }
+            }
+        }
+
+        if (empty($reasons)) {
+            foreach ($details as $item) {
+                if (is_array($item) && isset($item['title']) && is_string($item['title'])) {
+                    $reasons[] = $item['title'];
+                }
+            }
+        }
+
+        return $reasons;
     }
 
     public function getPassedCount(): int

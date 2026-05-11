@@ -4,3 +4,5 @@
 catraca_baseline.json
 *.cache
 .idea/
+/.php-cs-fixer.dist.php
+/.php-cs-fixer.cache

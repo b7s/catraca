@@ -97,8 +97,12 @@ class HumanFormatter
             $lines[] = 'Required Actions:';
             foreach ($actions as $i => $action) {
                 $lines[] = sprintf('  [%d] %s — %s', $i + 1, $action->type->value, $action->message);
-                foreach (array_slice($action->files, 0, 10) as $file) {
+                $reasons = $action->reasons;
+                foreach (array_slice($action->files, 0, 10) as $j => $file) {
                     $lines[] = sprintf('      -> %s', $file);
+                    if (isset($reasons[$j]) && $reasons[$j] !== '') {
+                        $lines[] = sprintf('         %s', $reasons[$j]);
+                    }
                 }
             }
             $lines[] = '';
@@ -122,8 +126,12 @@ class HumanFormatter
      */
     private function formatFiles(array &$lines, Action $action): void
     {
-        foreach (array_slice($action->files, 0, 10) as $file) {
+        $reasons = $action->reasons;
+        foreach (array_slice($action->files, 0, 10) as $i => $file) {
             $lines[] = sprintf('      → %s', $file);
+            if (isset($reasons[$i]) && $reasons[$i] !== '') {
+                $lines[] = sprintf('        %s', $reasons[$i]);
+            }
         }
         if (count($action->files) > 10) {
             $lines[] = sprintf('      → ... and %d more', count($action->files) - 10);
