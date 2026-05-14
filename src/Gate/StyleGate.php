@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
@@ -21,6 +22,10 @@ use function sprintf;
 
 class StyleGate implements GateInterface
 {
+    public function __construct(
+        private readonly SourcePathResolver $pathResolver = new SourcePathResolver,
+    ) {}
+
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $pint = $resolver->resolve('pint');
@@ -88,7 +93,7 @@ class StyleGate implements GateInterface
 
     private function runCsFixer(string $fixer, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $baseline->getSourceDirs());
+        $paths = $this->pathResolver->resolve($resolver->getProjectRoot(), $baseline->getSourceDirs());
         $cmd = [$resolver->resolvePhp(), $fixer, 'fix', '--dry-run', '--diff', '--format=json'];
         foreach ($paths as $path) {
             $cmd[] = $path;
@@ -132,21 +137,5 @@ class StyleGate implements GateInterface
             actions: $actions,
             details: $details,
         );
-    }
-
-    /**
-     * @param  array<int, string>  $sourceDirs
-     * @return array<int, string>
-     */
-    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
-    {
-        $paths = [];
-        foreach ($sourceDirs as $dir) {
-            if (is_dir($projectRoot.'/'.$dir)) {
-                $paths[] = $projectRoot.'/'.$dir;
-            }
-        }
-
-        return $paths !== [] ? $paths : [$projectRoot];
     }
 }

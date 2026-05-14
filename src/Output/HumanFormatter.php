@@ -13,6 +13,8 @@ use function sprintf;
 
 class HumanFormatter
 {
+    use BoxDrawer;
+
     public function format(CheckResult $result): string
     {
         /** @var array<int, string> $lines */
@@ -136,17 +138,5 @@ class HumanFormatter
         if (count($action->files) > 10) {
             $lines[] = sprintf('      → ... and %d more', count($action->files) - 10);
         }
-    }
-
-    private function box(string $text): string
-    {
-        $len = mb_strlen($text);
-
-        return sprintf("  ┌%s┐\n  │ %s │\n  └%s┘", str_repeat('─', $len + 2), $text, str_repeat('─', $len + 2));
-    }
-
-    private function divider(): string
-    {
-        return '  '.str_repeat('─', 60);
     }
 }

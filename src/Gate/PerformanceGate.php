@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
@@ -17,8 +18,12 @@ use function is_array;
 use function is_int;
 use function sprintf;
 
-class PerformanceGate implements GateInterface
+readonly class PerformanceGate implements GateInterface
 {
+    public function __construct(
+        private SourcePathResolver $pathResolver = new SourcePathResolver,
+    ) {}
+
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $violations = 0;
@@ -29,7 +34,7 @@ class PerformanceGate implements GateInterface
         $enabledRules = $this->getEnabledRules($baseline);
         $fixer = $resolver->resolve('php-cs-fixer');
         $sourceDirs = $baseline->getSourceDirs();
-        $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $sourceDirs);
+        $paths = $this->pathResolver->resolve($resolver->getProjectRoot(), $sourceDirs);
 
         if ($fixer !== null) {
             $rulesJson = self::buildRulesJson($enabledRules);
@@ -169,7 +174,7 @@ class PerformanceGate implements GateInterface
             }
         }
 
-        return json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}';
+        return $rules === [] ? '{}' : (json_encode($rules, JSON_UNESCAPED_SLASHES) ?: '{}');
     }
 
     /**
@@ -208,22 +213,6 @@ class PerformanceGate implements GateInterface
         $process->run();
 
         return CsFixerResultParser::parseJsonOutput($process->getOutput());
-    }
-
-    /**
-     * @param  array<int, string>  $sourceDirs
-     * @return array<int, string>
-     */
-    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
-    {
-        $paths = [];
-        foreach ($sourceDirs as $dir) {
-            if (is_dir($projectRoot.'/'.$dir)) {
-                $paths[] = $projectRoot.'/'.$dir;
-            }
-        }
-
-        return $paths !== [] ? $paths : [$projectRoot];
     }
 
     /**

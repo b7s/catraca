@@ -3,17 +3,17 @@
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Baseline;
-use B7S\Catraca\Gate\PerformanceGate;
+use B7S\Catraca\Fixer\AutoloadFixer;
+use B7S\Catraca\Fixer\CodeStyleFixer;
+use B7S\Catraca\Fixer\FixerInterface;
+use B7S\Catraca\Fixer\PerformanceFixer;
+use B7S\Catraca\FixResult;
 use B7S\Catraca\ToolResolver;
+use JsonException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Process\Process;
-
-use function sprintf;
 
 #[AsCommand(
     name: 'fix',
@@ -23,13 +23,27 @@ class FixCommand extends Command
 {
     use CommandHelper;
 
-    protected function configure(): void
+    /** @var array<int, FixerInterface> */
+    private array $fixers;
+
+    public function __construct()
     {
-        $this
-            ->addOption('path', 'p', InputOption::VALUE_REQUIRED, 'Project root path', getcwd())
-            ->addOption('plain', null, InputOption::VALUE_NONE, 'Plain text output (no ANSI colors)');
+        parent::__construct();
+        $this->fixers = [
+            new PerformanceFixer,
+            new CodeStyleFixer,
+            new AutoloadFixer,
+        ];
     }
 
+    protected function configure(): void
+    {
+        $this->addStandardOptions();
+    }
+
+    /**
+     * @throws JsonException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $projectRoot = $this->resolveProjectRoot($input, $output);
@@ -37,146 +51,16 @@ class FixCommand extends Command
             return Command::FAILURE;
         }
 
-        $io = new SymfonyStyle($input, $output);
-        $resolver = new ToolResolver($projectRoot);
         $baseline = new Baseline($projectRoot);
-        $sourceDirs = $baseline->getSourceDirs();
-        $fixed = 0;
-        $skipped = 0;
+        $resolver = new ToolResolver($projectRoot);
+        $result = new FixResult;
 
-        $result = $this->fixPerformance($resolver, $io, $projectRoot, $sourceDirs);
-        $fixed += $result['fixed'];
-        $skipped += $result['skipped'];
-
-        $result = $this->fixCodeStyle($resolver, $io, $sourceDirs);
-        $fixed += $result['fixed'];
-        $skipped += $result['skipped'];
-
-        $result = $this->fixAutoload($resolver, $io);
-        $fixed += $result['fixed'];
-        $skipped += $result['skipped'];
-
-        if ($fixed > 0) {
-            $io->success(sprintf('Fixed %d issue(s).', $fixed));
+        foreach ($this->fixers as $fixer) {
+            $result->add($fixer->fix($baseline, $resolver));
         }
-        if ($skipped > 0) {
-            $io->note(sprintf('%d fixer(s) skipped (tool not installed).', $skipped));
-        }
-        if ($fixed === 0 && $skipped === 0) {
-            $io->info('Nothing to fix.');
-        }
+
+        $this->formatFixResult($input, $output, $result);
 
         return Command::SUCCESS;
-    }
-
-    private function fixCodeStyle(ToolResolver $resolver, SymfonyStyle $io, array $sourceDirs): array
-    {
-        $pint = $resolver->resolve('pint');
-        if ($pint !== null) {
-            return $this->runFix('Code Style (pint)', [$resolver->resolvePhp(), $pint], $io);
-        }
-
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer !== null) {
-            $paths = $this->resolveSourcePaths($resolver->getProjectRoot(), $sourceDirs);
-            $cmd = [$resolver->resolvePhp(), $fixer, 'fix'];
-            foreach ($paths as $path) {
-                $cmd[] = $path;
-            }
-
-            return $this->runFix('Code Style (php-cs-fixer)', $cmd, $io);
-        }
-
-        $io->text('  — Code Style: skipped (install pint or php-cs-fixer)');
-
-        return ['fixed' => 0, 'skipped' => 1];
-    }
-
-    private function fixPerformance(ToolResolver $resolver, SymfonyStyle $io, string $projectRoot, array $sourceDirs): array
-    {
-        $fixer = $resolver->resolve('php-cs-fixer');
-        if ($fixer === null) {
-            $io->text('  — Performance: skipped (install php-cs-fixer)');
-
-            return ['fixed' => 0, 'skipped' => 1];
-        }
-
-        $baseline = new Baseline($projectRoot);
-        $enabledRules = $baseline->get('performance', 'rules', []);
-        $rulesJson = PerformanceGate::buildRulesJson($enabledRules);
-
-        if ($rulesJson === '{}') {
-            $io->text('  — Performance: no rules enabled');
-
-            return ['fixed' => 0, 'skipped' => 0];
-        }
-
-        $paths = $this->resolveSourcePaths($projectRoot, $sourceDirs);
-        $cmd = [
-            $resolver->resolvePhp(), $fixer, 'fix',
-            '--allow-risky=yes',
-            '--using-cache=no',
-            '--rules='.$rulesJson,
-        ];
-        foreach ($paths as $path) {
-            $cmd[] = $path;
-        }
-
-        return $this->runFix('Performance (php-cs-fixer)', $cmd, $io);
-    }
-
-    private function fixAutoload(ToolResolver $resolver, SymfonyStyle $io): array
-    {
-        $composer = $resolver->resolve('composer');
-        if ($composer === null) {
-            $io->text('  — Autoload: skipped (composer not found)');
-
-            return ['fixed' => 0, 'skipped' => 1];
-        }
-
-        $autoloadFile = $resolver->getProjectRoot().'/vendor/composer/autoload_classmap.php';
-        if (file_exists($autoloadFile)) {
-            return ['fixed' => 0, 'skipped' => 0];
-        }
-
-        return $this->runFix(
-            'Autoload optimization',
-            [$resolver->resolvePhp(), $composer, 'dump-autoload', '-o'],
-            $io,
-        );
-    }
-
-    private function runFix(string $label, array $command, SymfonyStyle $io): array
-    {
-        $io->text(sprintf('  <info>%s</info>...', $label));
-
-        $process = new Process($command);
-        $process->run();
-
-        if ($process->isSuccessful()) {
-            $io->text(sprintf('  ✔ %s — done', $label));
-
-            return ['fixed' => 1, 'skipped' => 0];
-        }
-
-        $io->text(sprintf('  ✘ %s — %s', $label, trim($process->getErrorOutput() ?: $process->getOutput())));
-
-        return ['fixed' => 0, 'skipped' => 0];
-    }
-
-    /**
-     * @param  array<int, string>  $sourceDirs
-     * @return array<int, string>
-     */
-    private function resolveSourcePaths(string $projectRoot, array $sourceDirs): array
-    {
-        $paths = [];
-        foreach ($sourceDirs as $dir) {
-            if (is_dir($projectRoot.'/'.$dir)) {
-                $paths[] = $projectRoot.'/'.$dir;
-            }
-        }
-
-        return $paths !== [] ? $paths : [$projectRoot];
     }
 }

@@ -1,9 +1,7 @@
 #!/usr/bin/env php
 <?php
 
-use B7S\Catraca\Command\CheckCommand;
-use B7S\Catraca\Command\FixCommand;
-use B7S\Catraca\Command\InitCommand;
+use B7S\Catraca\Command\CommandDiscovery;
 use Symfony\Component\Console\Application;
 
 $autoload = __DIR__ . '/../vendor/autoload.php';
@@ -16,10 +14,15 @@ $version = file_get_contents(__DIR__ . '/../version') ?? '1.0.0';
 $version = trim($version);
 
 $application = new Application('catraca', $version);
-$application->addCommands([
-    new InitCommand(),
-    new CheckCommand(),
-    new FixCommand(),
-]);
+
+// Auto-discover commands from src/Command/
+$discovery = new CommandDiscovery;
+$commandDir = __DIR__ . '/../src/Command';
+$commandNamespace = 'B7S\\Catraca\\Command';
+
+foreach ($discovery->discover($commandDir, $commandNamespace) as $commandClass) {
+    $application->addCommand(new $commandClass);
+}
+
 $application->setDefaultCommand('check', false);
 $application->run();
