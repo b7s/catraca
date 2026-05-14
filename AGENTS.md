@@ -1,6 +1,6 @@
 # AGENTS.md — PHP CLI Architecture Best Practices
 
-This document captures architectural patterns, best practices, and design decisions for building maintainable, testable, and well-organized PHP command-line applications. These principles apply to any PHP project using Symfony Console, Tempest Console, or similar CLI frameworks.
+This document captures architectural patterns, best practices, and design decisions for building maintainable, testable, and well-organized PHP command-line applications. These principles apply to any PHP project using Symfony Console, Laravel Artisan, Tempest Console, or similar CLI frameworks.
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@ This document captures architectural patterns, best practices, and design decisi
 6. [Auto-Discovery](#auto-discovery)
 7. [Code Quality Principles](#code-quality-principles)
 8. [Error Handling](#error-handling)
-9. [Lessons from Tempest](#lessons-from-tempest)
+9. [Framework-Specific Notes](#framework-specific-notes)
 10. [Checklist for New Commands](#checklist-for-new-commands)
 
 ---
@@ -21,7 +21,7 @@ This document captures architectural patterns, best practices, and design decisi
 
 ### Thin Command Pattern
 Commands must be **ultra-thin orchestrators**. They should:
-- Accept input and resolve the project root
+- Accept input and resolve context (project root, arguments, options)
 - Delegate all business logic to dedicated services
 - Format and output results
 - Return exit codes
@@ -287,17 +287,84 @@ if ($projectRoot === null) {
 
 ---
 
-## Lessons from Tempest
+## Framework-Specific Notes
 
-The [Tempest 100-million-row-challenge](https://github.com/tempestphp/100-million-row-challenge) demonstrated these patterns effectively:
+### Symfony Console
+- Use `#[AsCommand]` attributes for routing
+- Register commands via `Application::add()` or auto-discovery
+- Leverage `SymfonyStyle` for interactive I/O
+- Use `InputOption` and `InputArgument` for type-safe input
 
-1. **Commands as thin controllers**: `DataParseCommand` is 15 lines — it measures time and delegates to `Parser`.
-2. **Attribute-based routing**: `#[ConsoleCommand]` eliminates boilerplate registration.
-3. **Trait-based I/O**: `HasConsole` provides semantic output helpers (`success()`, `error()`).
-4. **Constructor injection**: Dependencies like `HttpClient` and `Cache` are injected, not instantiated.
-5. **Middleware support**: Cross-cutting concerns (e.g., `ForceMiddleware`) are handled outside the command.
+### Laravel Artisan
+- Place commands in `app/Console/Commands/`
+- Use `php artisan make:command` scaffolding
+- Register in `$commands` array within `Console\Kernel` (or auto-discover)
+- Leverage Laravel's service container for dependency injection
+- Use `$this->info()`, `$this->error()`, `$this->table()` helpers
 
-Adapt these patterns to your framework while preserving the same architectural philosophy.
+### Tempest Console
+- Use `#[ConsoleCommand]` attributes
+- Leverage `HasConsole` trait for semantic output (`success()`, `error()`)
+- Use middleware for cross-cutting concerns
+- Prefer constructor injection via the framework's container
+
+### Generic PHP (no framework)
+- Use `symfony/console` as the de-facto standard
+- Build a minimal `Application` bootstrap in `bin/` or `cli`
+- Implement your own auto-discovery or manually register commands
+- Use composer autoloading (`vendor/autoload.php`)
+
+---
+
+## Directory Structure Examples
+
+### Standalone / Symfony Console Project
+```
+src/
+├── Command/              # CLI commands (orchestrators only)
+│   ├── ImportCommand.php
+│   ├── ExportCommand.php
+│   └── CommandDiscovery.php
+├── Service/              # Business logic services
+│   ├── ImportService.php
+│   └── ExportService.php
+├── Output/               # Result formatters
+│   ├── HumanFormatter.php
+│   ├── JsonFormatter.php
+│   └── GithubFormatter.php
+├── Result.php            # Aggregate results
+├── ProjectResolver.php
+└── ProcessRunner.php
+```
+
+### Laravel Project
+```
+app/
+├── Console/
+│   ├── Commands/         # Artisan commands
+│   │   ├── ImportCommand.php
+│   │   └── ExportCommand.php
+│   └── Kernel.php        # Command registration & scheduling
+├── Services/             # Business logic
+│   ├── ImportService.php
+│   └── ExportService.php
+├── Formatters/           # Output formatters
+│   ├── HumanFormatter.php
+│   └── JsonFormatter.php
+└── Resolvers/            # Path/config resolution
+    └── ProjectResolver.php
+```
+
+### Package / Library Structure
+```
+src/
+├── Command/
+│   └── YourCommand.php
+├── Service/
+│   └── YourService.php
+└── Output/
+    └── YourFormatter.php
+```
 
 ---
 
@@ -305,7 +372,7 @@ Adapt these patterns to your framework while preserving the same architectural p
 
 When adding a new command, verify:
 
-- [ ] Command class is in `src/Command/` and has the framework's command attribute
+- [ ] Command class is in the designated commands directory and has the framework's command attribute
 - [ ] Uses a shared trait or base class for standard options
 - [ ] Does not exceed 60 lines of logic (extract services if needed)
 - [ ] Delegates all business logic to services
@@ -314,14 +381,14 @@ When adding a new command, verify:
 - [ ] Supports `--plain` option (no ANSI colors)
 - [ ] Validates inputs early and returns `Command::FAILURE` on invalid input
 - [ ] Will be auto-discovered by the application entry point (no manual registration needed)
-- [ ] Has corresponding formatter(s) in `src/Output/` if producing new output types
+- [ ] Has corresponding formatter(s) if producing new output types
 
 ---
 
 ## File Organization
 
 ```
-src/
+src/ (or app/)
 ├── Command/          # CLI commands (orchestrators only)
 │   ├── ImportCommand.php
 │   ├── ExportCommand.php
