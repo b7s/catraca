@@ -11,9 +11,10 @@ This document captures architectural patterns, best practices, and design decisi
 5. [Dependency Injection](#dependency-injection)
 6. [Auto-Discovery](#auto-discovery)
 7. [Code Quality Principles](#code-quality-principles)
-8. [Error Handling](#error-handling)
-9. [Framework-Specific Notes](#framework-specific-notes)
-10. [Checklist for New Commands](#checklist-for-new-commands)
+8. [Performance Optimization](#performance-optimization)
+9. [Error Handling](#error-handling)
+10. [Framework-Specific Notes](#framework-specific-notes)
+11. [Checklist for New Commands](#checklist-for-new-commands)
 
 ---
 
@@ -250,6 +251,165 @@ Follow these conventions:
 | Formatters | `*Formatter` suffix, in `Output\` namespace |
 | Interfaces | `*Interface` suffix |
 | Traits | Descriptive noun, no suffix |
+
+---
+
+## Performance Optimization
+
+### Import Native Functions Explicitly
+Always import native PHP functions with `use function` to bypass namespace resolution overhead:
+
+```php
+<?php
+
+namespace App\Service;
+
+use function array_filter;
+use function array_map;
+use function count;
+use function explode;
+use function implode;
+use function is_array;
+use function is_string;
+use function sprintf;
+use function str_contains;
+use function strlen;
+use function trim;
+
+class ImportService
+{
+    public function process(array $lines): array
+    {
+        return array_filter(
+            array_map(static fn (string $line): string => trim($line), $lines),
+            static fn (string $line): bool => str_contains($line, '@'),
+        );
+    }
+}
+```
+
+**Why:** PHP resolves unqualified function calls in namespaced code by first checking the current namespace, then falling back to the global namespace. Explicit imports eliminate this lookup.
+
+### Prefer Static Methods and Closures
+When a method does not use `$this`, declare it `static`:
+
+```php
+// Good — no $this binding overhead
+public static function normalize(string $input): string
+{
+    return strtolower(trim($input));
+}
+
+// Good — static closure
+$normalized = array_map(
+    static fn (string $line): string => strtolower(trim($line)),
+    $lines,
+);
+```
+
+**Why:** Non-static closures capture `$this` by default, creating a reference cycle and preventing garbage collection.
+
+### Use Strict Comparison (`===`)
+Always prefer `===` and `!==` over `==` and `!=`:
+
+```php
+if ($value === null) { /* ... */ }      // Fast type check
+if ($status === Status::Active) { /* ... */ }
+```
+
+**Why:** Loose comparison triggers type juggling and multiple type checks internally.
+
+### Use Modern String Functions
+Prefer PHP 8+ string functions over `strpos`/`substr` combinations:
+
+```php
+// Good — single operation, no comparison
+if (str_contains($haystack, $needle)) { /* ... */ }
+if (str_starts_with($path, '/')) { /* ... */ }
+if (str_ends_with($file, '.php')) { /* ... */ }
+
+// Avoid — two operations
+if (strpos($haystack, $needle) !== false) { /* ... */ }
+```
+
+### Pre-allocate Arrays and Avoid `count()` in Loops
+```php
+// Avoid — count() called on every iteration
+for ($i = 0; $i < count($items); $i++) { /* ... */ }
+
+// Good — cache the count
+$count = count($items);
+for ($i = 0; $i < $count; $i++) { /* ... */ }
+
+// Better — foreach is optimized for arrays
+foreach ($items as $item) { /* ... */ }
+
+// Best — pre-allocate when size is known
+$result = [];
+$result = array_fill(0, count($items), null);
+foreach ($items as $i => $item) {
+    $result[$i] = transform($item);
+}
+```
+
+### Buffer Output
+Minimize I/O by collecting output in memory and writing once:
+
+```php
+// Avoid — multiple I/O calls
+foreach ($results as $result) {
+    $output->writeln(format($result));
+}
+
+// Good — single write
+$lines = [];
+foreach ($results as $result) {
+    $lines[] = format($result);
+}
+$output->write(implode("\n", $lines));
+```
+
+### Cache Expensive Lookups
+```php
+// Avoid — repeated disk or network calls
+foreach ($files as $file) {
+    if (file_exists($file)) { /* ... */ }
+}
+
+// Good — cache results
+$cache = [];
+foreach ($files as $file) {
+    $cache[$file] ??= file_exists($file);
+    if ($cache[$file]) { /* ... */ }
+}
+```
+
+### Use Generators for Large Datasets
+```php
+// Memory-efficient streaming
+public function readLines(string $path): \Generator
+{
+    $handle = fopen($path, 'r');
+    while ($line = fgets($handle)) {
+        yield trim($line);
+    }
+    fclose($handle);
+}
+
+// Usage — processes one line at a time
+foreach ($this->readLines($path) as $line) {
+    $this->process($line);
+}
+```
+
+### JSON Encoding Flags
+```php
+// Fastest — avoid pretty-print and escaping in production
+json_encode($data, JSON_UNESCAPED_SLASHES);
+
+// Debugging only — consumes more memory and CPU
+json_encode($data, JSON_PRETTY_PRINT);
+```
 
 ---
 
