@@ -85,7 +85,7 @@ class UserController
 
 ### Thin Layers Pattern
 Every layer in your application should be thin:
-- **Controllers / Commands** — Accept input, delegate, return output (≤ 200 lines)
+- **Controllers / Commands** — Accept input, delegate, return output (≤ 1000 lines)
 - **Services** — Orchestrate business operations (≤ 250 lines)
 - **Repositories / Query Builders** — Abstract data access
 - **Value Objects / DTOs** — Encapsulate data with validation
@@ -110,11 +110,11 @@ class ImportService
 }
 
 // Good — concise
-class ImportService
+readonly class ImportService
 {
     public function __construct(
-        private readonly CsvParser $parser,
-        private readonly LoggerInterface $logger,
+        private CsvParser $parser,
+        private LoggerInterface $logger,
     ) {}
 }
 ```
@@ -164,6 +164,11 @@ Do not allow empty `__construct()` methods with zero parameters unless the const
 class Calculator
 {
     public function __construct() {}
+
+    public static function add(int $a, int $b): int
+    {
+        return $a + $b;
+    }
 }
 
 // Good — no constructor needed
@@ -225,12 +230,12 @@ Never echo output directly from services. Return structured result objects that 
 
 **Pattern:**
 ```php
-class PaymentResult
+readonly class PaymentResult
 {
     public function __construct(
-        public readonly bool $success,
-        public readonly string $transactionId,
-        public readonly ?string $errorMessage = null,
+        public bool $success,
+        public string $transactionId,
+        public ?string $errorMessage = null,
     ) {}
 
     public function isSuccess(): bool
@@ -253,13 +258,13 @@ class PaymentResult
 - Multiple output formats (JSON, HTML, CLI) from the same result
 - Testable assertions on result data
 - Composable — results can be merged, filtered, transformed
-- Type-safe — the structure is enforced by the class
+- Type-safe — the class enforces the structure
 
 ### Mirror Existing Patterns
 When creating a new result type, mirror the structure of existing result types in the project. Maintain consistency in:
 - Count methods (`get*Count()`)
 - Status methods (`isSuccess()`, `isPass()`)
-- Serialization (`toArray()`)
+- Serialization (`toArray()`, `toJson()`,)
 
 ---
 
@@ -355,7 +360,7 @@ class InvoiceService
 ## Code Quality Principles
 
 ### DRY (Don't Repeat Yourself)
-Before extracting, identify duplication via tools like `phpcpd`. Common duplications to watch for:
+Before extracting, identify duplication via tools like `phpcpd`, `b7s/catraca`. Common duplications to watch for:
 - Path resolution logic
 - Source directory iteration
 - Box/divider rendering in formatters
@@ -370,6 +375,7 @@ Each class should have one reason to change:
 - **Formatters** change when output format changes
 - **Validators** change when validation criteria change
 - **Repositories** change when data access logic changes
+- **ENUM** values change when new states are added
 
 ### Consistent Naming
 Follow these conventions:
@@ -804,14 +810,118 @@ if ($tool === null) {
 }
 ```
 
-### Return Meaningful Exit Codes (CLI/Github Actions)
+### Return Meaningful Exit Codes (CLI/GitHub Actions)
 | Code | Meaning |
 |------|---------|
 | `0` | Success / all operations passed |
 | `1` | Failure / one or more operations failed |
 
+### Fail Fast
+Detect and report errors as early as possible — at the entry point of a method, not buried deep in logic. When something is wrong, fail immediately with a clear message. Do not continue execution hoping for the best.
+
+**Core principle:** Every method should validate its preconditions first, then proceed with the happy path at the top level of indentation.
+
+**Before (bad — deeply nested, hides the happy path):**
+```php
+public function processOrder(OrderData $data): OrderResult
+{
+    if ($data->items !== []) {
+        $customer = $this->customerRepo->find($data->customerId);
+        if ($customer !== null) {
+            if ($customer->isActive()) {
+                $total = $this->calculator->calculate($data->items);
+                if ($total > 0) {
+                    $payment = $this->payment->charge($customer, $total);
+                    if ($payment->isSuccess()) {
+                        return new OrderResult(success: true, orderId: $payment->transactionId);
+                    }
+                    return new OrderResult(success: false, error: 'Payment failed');
+                }
+                return new OrderResult(success: false, error: 'Invalid total');
+            }
+            return new OrderResult(success: false, error: 'Customer inactive');
+        }
+        return new OrderResult(success: false, error: 'Customer not found');
+    }
+    return new OrderResult(success: false, error: 'No items');
+}
+```
+
+**After (good — guard clauses, flat happy path):**
+```php
+public function processOrder(OrderData $data): OrderResult
+{
+    if ($data->items === []) {
+        return new OrderResult(success: false, error: 'No items');
+    }
+
+    $customer = $this->customerRepo->find($data->customerId);
+    if ($customer === null) {
+        return new OrderResult(success: false, error: 'Customer not found');
+    }
+
+    if (!$customer->isActive()) {
+        return new OrderResult(success: false, error: 'Customer inactive');
+    }
+
+    $total = $this->calculator->calculate($data->items);
+    if ($total <= 0) {
+        return new OrderResult(success: false, error: 'Invalid total');
+    }
+
+    $payment = $this->payment->charge($customer, $total);
+    if (!$payment->isSuccess()) {
+        return new OrderResult(success: false, error: 'Payment failed');
+    }
+
+    return new OrderResult(success: true, orderId: $payment->transactionId);
+}
+```
+
+**Benefits of fail fast:**
+- **Flat indentation** — the happy path stays at the top level, no nesting
+- **Readable top-to-bottom** — preconditions first, then business logic
+- **Early exit** — each guard clause returns immediately, no mental stacking
+- **Easier debugging** — failures surface at the exact point they occur
+- **Fewer bugs** — you never accidentally proceed with invalid state
+
+**Guard Clause Patterns:**
+
+```php
+// Null check
+if ($value === null) {
+    return $fallback;
+}
+
+// Empty collection
+if ($items === []) {
+    return new Result(success: false, error: 'No items provided');
+}
+
+// Invalid state
+if (!$this->isReady()) {
+    throw new InvalidStateException('Service not initialized');
+}
+
+// Missing dependency
+$tool = $this->resolver->resolve('required-tool');
+if ($tool === null) {
+    return new TaskResult(skipped: true, message: 'Missing required-tool');
+}
+
+// Authorization
+if (!$user->can('edit', $resource)) {
+    throw new AuthorizationException('Not allowed');
+}
+```
+
+**When to throw vs return:**
+- **Throw** for programmer errors and invariant violations (invalid arguments, impossible states)
+- **Return** for expected business failures (customer not found, payment declined, missing optional dependency)
+- **Skip** for optional operations that can be safely bypassed (tool not installed, feature disabled)
+
 ### Validate Early
-Resolve and validate inputs before doing any work:
+Resolve and validate inputs before doing any work — a specific application of fail fast at the entry point:
 
 ```php
 $projectRoot = $this->resolveProjectRoot($input, $output);
@@ -885,15 +995,27 @@ The application entry point should auto-discover commands from a designated dire
 
 ### Laravel
 - **Commands**: Place in `app/Console/Commands/`, use `php artisan make:command`
+    - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior
 - **Controllers**: Keep thin, delegate to services
 - **Models**: Use `casts()` method over `$casts` property (Laravel 12+)
+    - When creating new models, create useful factories and seeders for them too
 - **Database**: Avoid `DB::`; prefer `Model::query()`. Prevent N+1 with eager loading
-- **Relationships**: Always use proper Eloquent relationship methods with return type hints
-- **Tests**: Use Pest. Run with `php artisan test --compact`
-- **Code Style**: Run `vendor/bin/pint --dirty --format agent` before committing
+    - When modifying a column, the migration must include all the attributes previously defined on the column. Otherwise, they will be dropped and lost.
+    - Laravel 12+ allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10)`
+- **Relationships**: Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins
 - **Routing**: Prefer named routes and the `route()` function; never hardcode URLs
 - **Queue**: Use `ShouldQueue` for time-consuming operations
 - **Auth**: Use built-in gates, policies, Sanctum
+- **Code Style**: Run `vendor/bin/pint --dirty --format agent` before committing. Do not run `--test` mode — simply run it to fix formatting issues
+- **Tests**: All tests must be written using Pest. Use `php artisan make:test --pest {name}`
+    - Tests should test all the happy paths, failure paths, and weird paths
+    - To run all tests: `php artisan test --compact`
+    - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file)
+    - Use datasets in Pest to simplify tests that have a lot of duplicated data
+    - Mocking can be very helpful when appropriate
+    - Browser testing is incredibly powerful and useful for this project. Browser tests should live in `tests/Browser/`
+    - You must not remove any tests or test files from the tests directory without approval
+    - Check documentation when needed: https://pestphp.com/docs/
 
 ### Tempest Console
 - Use `#[ConsoleCommand]` attributes
@@ -909,64 +1031,14 @@ The application entry point should auto-discover commands from a designated dire
 
 ---
 
-## Directory Structure Examples
-
-### Standalone / Symfony Console Project
-```
-src/
-├── Command/              # CLI commands (orchestrators only)
-│   ├── ImportCommand.php
-│   ├── ExportCommand.php
-│   └── CommandDiscovery.php
-├── Service/              # Business logic services
-│   ├── ImportService.php
-│   └── ExportService.php
-├── Output/               # Result formatters
-│   ├── HumanFormatter.php
-│   ├── JsonFormatter.php
-│   └── GithubFormatter.php
-├── Result.php            # Aggregate results
-├── ProjectResolver.php
-└── ProcessRunner.php
-```
-
-### Laravel Project
-```
-app/
-├── Console/
-│   ├── Commands/         # Artisan commands
-│   │   ├── ImportCommand.php
-│   │   └── ExportCommand.php
-│   └── Kernel.php        # Command registration & scheduling
-├── Http/
-│   ├── Controllers/      # Thin controllers
-│   └── Requests/         # Form request validation
-├── Models/               # Eloquent models
-├── Services/             # Business logic
-│   ├── ImportService.php
-│   └── ExportService.php
-├── Repositories/         # Data access abstraction
-├── Formatters/           # Output formatters
-└── Resolvers/            # Path/config resolution
-```
-
-### Package / Library Structure
-```
-src/
-├── Command/
-│   └── YourCommand.php
-├── Service/
-│   └── YourService.php
-└── Output/
-    └── YourFormatter.php
-```
-
----
-
 ## Other Considerations
 
-- Always use strict typing at the head of a `.php` file: `declare(strict_types=1);`.
+### General Rules
 - Don't include any superfluous PHP Annotations, except ones that start with `@` for typing variables
+- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless there is something very complex going on.
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed
+- Always add the return type for methods
 
 ### PHPDoc for Model Properties
 Every model/entity class MUST declare all its properties in a class-level PHPDoc block with correct types. This enables static analysis tools (PHPStan, Psalm) to understand dynamic properties and provides IDE autocompletion.
@@ -1027,68 +1099,29 @@ class User extends Model
   ```
 
 This applies to all ORM models, DTOs, and any class with dynamic or non-promoted properties.
-- Use PHP 8 constructor property promotion in `__construct()`
-- Do not allow empty `__construct()` methods with zero parameters unless the constructor is private
-- Always use curly braces for control structures, even if it has one line.
-- Always use explicit return type declarations for methods and functions.
-- Use appropriate PHP type hints for method parameters.
-- Lambdas not using `$this` that should be `static`. Simple example: `static fn (int $x): int => $x+1;`
-- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless there is something very complex going on.
-- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed
-- For Laravel:
-    - Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.).
-        - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior
-    - Use queued jobs for time-consuming operations with the `ShouldQueue` interface
-    - Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum, etc.)
-    - When generating links to other pages, prefer named routes and the `route()` function
-        - Never add hardcoded URLs
-    - Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins
-    - Database:
-        - Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing them
-        - Generate code that prevents N+1 query problems by using eager loading
-        - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-        - Laravel 12+ allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10)`
-    - Models:
-        - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models
-        - When creating new models, create useful factories and seeders for them too
-    - Code format:
-        - You must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-        - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues
-    - Tests:
-        - All tests must be written using Pest. Use `php artisan make:test --pest {name}`.
-        - You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files - these are core to the application.
-        - Tests should test all of the happy paths, failure paths, and weird paths.
-        - Tests live in the `tests/Feature` and `tests/Unit` directories
-        - To run all tests: `php artisan test --compact`
-        - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file)
-        - Use datasets in Pest to simplify tests that have a lot of duplicated data
-        - Mocking can be very helpful when appropriate
-        - Browser testing is incredibly powerful and useful for this project.
-        - Browser tests should live in `tests/Browser/`
-    - FilamentPHP:
-        - Always use Filament-specific Artisan commands to create files. Find available commands with the `php artisan --help` command
-        - Patterns:
-            - Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values
-            - Use `Get $get` to read other form field values for conditional logic, like `->visible(fn (Get $get): bool => $get('type') === 'business')`
-            - Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates
-            - Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`
-            - Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name
-            - Use `state()` with a `Closure` to compute derived column values
-            - Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic
-            - **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields
-            - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed
-            - **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved
-                - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
-                - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
-                - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
-        - Correct Namespaces
-            - Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
-            - Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
-            - Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
-            - Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
-            - Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
-            - Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
-            - Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
-            - Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
+
+### FilamentPHP
+- Always use Filament-specific Artisan commands to create files. Find available commands with the `php artisan --help` command
+- Patterns:
+    - Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values
+    - Use `Get $get` to read other form field values for conditional logic, like `->visible(fn (Get $get): bool => $get('type') === 'business')`
+    - Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates
+    - Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`
+    - Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name
+    - Use `state()` with a `Closure` to compute derived column values
+    - Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic
+    - **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields
+    - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed
+    - **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved
+        - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
+        - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
+        - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
+- Correct Namespaces
+    - Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
+    - Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
+    - Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
+    - Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
+    - Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
+    - Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
+    - Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
+    - Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
