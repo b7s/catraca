@@ -1,80 +1,180 @@
-# AGENTS.md — PHP CLI Architecture Best Practices
+# AGENTS.md — PHP Architecture & Performance Best Practices
 
-This document captures architectural patterns, best practices, and design decisions for building maintainable, testable, and well-organized PHP command-line applications. These principles apply to any PHP project using Symfony Console, Laravel Artisan, Tempest Console, or similar CLI frameworks.
+This document captures architectural patterns, best practices, and design decisions for building maintainable, testable, and well-organized PHP applications. These principles apply to any PHP codebase — whether web APIs, CLI tools, background workers, or libraries — using any modern framework or none at all.
 
 ## Table of Contents
 
-1. [Command Architecture](#command-architecture)
+1. [Class Design Principles](#class-design-principles)
 2. [Service Extraction](#service-extraction)
 3. [Result Objects](#result-objects)
-4. [Output Formatting](#output-formatting)
+4. [Separation of Concerns](#separation-of-concerns)
 5. [Dependency Injection](#dependency-injection)
-6. [Auto-Discovery](#auto-discovery)
-7. [Code Quality Principles](#code-quality-principles)
-8. [Performance Optimization](#performance-optimization)
-9. [Error Handling](#error-handling)
+6. [Code Quality Principles](#code-quality-principles)
+7. [Performance Optimization](#performance-optimization)
+8. [Error Handling](#error-handling)
+9. [CLI-Specific Patterns](#cli-specific-patterns)
 10. [Framework-Specific Notes](#framework-specific-notes)
-11. [Checklist for New Commands](#checklist-for-new-commands)
+11. [Directory Structure Examples](#directory-structure-examples)
+12. [Other Considerations](#other-considerations)
 
 ---
 
-## Command Architecture
+## Class Design Principles
 
-### Thin Command Pattern
-Commands must be **ultra-thin orchestrators**. They should:
-- Accept input and resolve context (project root, arguments, options)
-- Delegate all business logic to dedicated services
-- Format and output results
-- Return exit codes
+### Single Responsibility
+Every class should have one reason to change. If a class handles input parsing, business logic, and output formatting, split it.
 
-**Maximum recommended command length**: 60 lines. If a command exceeds this, extract logic into a service.
-
-**Before (bad — business logic inside command):**
+**Before (bad — mixed concerns):**
 ```php
-class ImportCommand extends Command
+class UserController
 {
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    public function store(Request $request): Response
     {
-        // 150+ lines of parsing, validation, database operations...
-        $file = $input->getArgument('file');
-        $handle = fopen($file, 'r');
-        while ($row = fgetcsv($handle)) {
-            // validate, transform, insert...
-        }
+        // Validation
+        $data = $request->validate([
+            'email' => 'required|email',
+            'name' => 'required|string',
+        ]);
+
+        // Business logic
+        $user = new User;
+        $user->email = $data['email'];
+        $user->name = $data['name'];
+        $user->password = bcrypt($data['password']);
+        $user->save();
+
+        // Side effect
+        Mail::to($user)->send(new WelcomeEmail($user));
+
+        // Formatting
+        return response()->json([
+            'id' => $user->id,
+            'email' => $user->email,
+            'created_at' => $user->created_at->toIso8601String(),
+        ]);
+    }
+    
+    public function show(Request $request): Response
+    {
         // ...
     }
 }
 ```
 
-**After (good — delegates to services):**
+**After (good — thin controller, rich service):**
 ```php
-class ImportCommand extends Command
+class UserController
 {
     public function __construct(
-        private readonly ImportService $importer,
-    ) {
-        parent::__construct();
-    }
+        private readonly UserService $users,
+    ) {}
 
-    protected function execute(InputInterface $input, OutputInterface $output): int
+    public function store(CreateUserRequest $request): UserResource
     {
-        $file = $input->getArgument('file');
-        $result = $this->importer->import($file);
-        
-        $this->formatResult($input, $output, $result);
-        
-        return $result->isSuccess() ? Command::SUCCESS : Command::FAILURE;
+        $user = $this->users->create($request->validated());
+
+        return new UserResource($user);
+    }
+    
+    public function show(Request $request): Response
+    {
+        // ...
     }
 }
 ```
 
-### Shared Command Concerns
-Extract cross-cutting concerns into a trait or base class:
-- `--path` / `--format` / `--plain` option definitions
-- Project root resolution
-- Result formatting
+### Thin Layers Pattern
+Every layer in your application should be thin:
+- **Controllers / Commands** — Accept input, delegate, return output (≤ 200 lines)
+- **Services** — Orchestrate business operations (≤ 250 lines)
+- **Repositories / Query Builders** — Abstract data access
+- **Value Objects / DTOs** — Encapsulate data with validation
 
-Never duplicate option definitions or path resolution logic across commands.
+When any layer grows beyond its limit, extract a new class.
+
+### Constructor Property Promotion
+Use PHP 8+ constructor property promotion to reduce boilerplate:
+
+```php
+// Avoid — unnecessary repetition
+class ImportService
+{
+    private CsvParser $parser;
+    private LoggerInterface $logger;
+
+    public function __construct(CsvParser $parser, LoggerInterface $logger)
+    {
+        $this->parser = $parser;
+        $this->logger = $logger;
+    }
+}
+
+// Good — concise
+class ImportService
+{
+    public function __construct(
+        private readonly CsvParser $parser,
+        private readonly LoggerInterface $logger,
+    ) {}
+}
+```
+
+### Readonly Classes vs Readonly Properties
+When **all** constructor-promoted properties are `readonly`, prefer making the **entire class readonly** instead of individual properties. This reduces boilerplate and signals immutability at the class level.
+
+**Before (bad — redundant `readonly` on every parameter):**
+```php
+class UserData
+{
+    public function __construct(
+        private readonly string $name,
+        private readonly string $email,
+        private readonly DateTimeImmutable $createdAt,
+    ) {}
+}
+```
+
+**After (good — class-level readonly):**
+```php
+readonly class UserData
+{
+    public function __construct(
+        private string $name,
+        private string $email,
+        private DateTimeImmutable $createdAt,
+    ) {}
+}
+```
+
+**When to use `readonly class`:**
+- All properties are initialized via constructor promotion
+- No property needs to be mutable after construction
+- The class has no dynamic properties
+
+**When NOT to use `readonly class`:**
+- Any property needs to be mutable (e.g., counters, state tracking)
+- The class has non-promoted properties that must be writable
+- The class extends a non-readonly parent (PHP limitation)
+
+### Empty Constructors
+Do not allow empty `__construct()` methods with zero parameters unless the constructor is private (e.g., for singletons or static factories).
+
+```php
+// Bad — pointless
+class Calculator
+{
+    public function __construct() {}
+}
+
+// Good — no constructor needed
+class Calculator
+{
+    public static function add(int $a, int $b): int
+    {
+        return $a + $b;
+    }
+}
+```
 
 ---
 
@@ -84,7 +184,7 @@ Never duplicate option definitions or path resolution logic across commands.
 Extract a service when you encounter any of these smells:
 1. A method does not use `$this` (can be static / standalone)
 2. The same logic exists in 2+ locations
-3. A class exceeds 150 lines
+3. A class exceeds 250 lines
 4. A method has more than 3 levels of indentation
 5. Mixed levels of abstraction in one method
 
@@ -93,51 +193,67 @@ Extract a service when you encounter any of these smells:
 | Category | Responsibility | Examples |
 |----------|---------------|----------|
 | **Resolvers** | Locate and validate external resources | `ProjectResolver`, `ConfigResolver` |
-| **Executors** | Execute a specific operation | `ImportService`, `ExportService` |
+| **Executors** | Execute a specific operation | `ImportService`, `ExportService`, `PaymentProcessor` |
 | **Formatters** | Render results to output formats | `HumanFormatter`, `JsonFormatter` |
 | **Runners** | Execute external processes | `ProcessRunner` |
 | **Validators** | Run a single validation check | `SchemaValidator`, `FileValidator` |
+| **Repositories** | Abstract data persistence | `UserRepository`, `OrderRepository` |
+| **Transformers** | Convert between representations | `UserTransformer`, `ApiResource` |
 
 ### Interface Segregation
 Services that are swappable should implement an interface:
 
 ```php
-interface TaskInterface
+interface PaymentProcessorInterface
 {
-    public function getLabel(): string;
-    public function run(Context $context): TaskResult;
+    public function charge(Customer $customer, Money $amount): PaymentResult;
+    public function refund(string $transactionId): RefundResult;
 }
 ```
 
 This enables:
-- Polymorphic iteration (`foreach ($tasks as $task)`)
+- Polymorphic usage (`$gateway->charge(...)`)
 - Easy testing with mocks
-- Future extensibility
+- Future extensibility (e.g., switching from Stripe to PayPal)
 
 ---
 
 ## Result Objects
 
 ### Always Return Structured Results
-Never echo output directly from services. Return structured result objects that the command layer formats.
+Never echo output directly from services. Return structured result objects that the presentation layer formats.
 
 **Pattern:**
 ```php
-class TaskResult
+class PaymentResult
 {
-    private array $items = [];
+    public function __construct(
+        public readonly bool $success,
+        public readonly string $transactionId,
+        public readonly ?string $errorMessage = null,
+    ) {}
 
-    public function add(ItemResult $result): void { /* ... */ }
-    public function getSuccessCount(): int { /* ... */ }
-    public function getFailureCount(): int { /* ... */ }
-    public function toArray(): array { /* ... */ }
+    public function isSuccess(): bool
+    {
+        return $this->success;
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'success' => $this->success,
+            'transaction_id' => $this->transactionId,
+            'error' => $this->errorMessage,
+        ];
+    }
 }
 ```
 
 **Benefits:**
-- Multiple output formats (human, JSON, GitHub Actions) from the same result
+- Multiple output formats (JSON, HTML, CLI) from the same result
 - Testable assertions on result data
 - Composable — results can be merged, filtered, transformed
+- Type-safe — the structure is enforced by the class
 
 ### Mirror Existing Patterns
 When creating a new result type, mirror the structure of existing result types in the project. Maintain consistency in:
@@ -147,32 +263,41 @@ When creating a new result type, mirror the structure of existing result types i
 
 ---
 
-## Output Formatting
+## Separation of Concerns
 
-### Separate Formatting from Business Logic
+### Formatting is Not Business Logic
 Formatters are pure functions that take a result object and return a string. They must not:
 - Execute processes
 - Read files
 - Access the database
 - Produce side effects
 
-### Support All Output Formats
-Every command that produces structured output should support:
-- `human` — terminal-friendly with ANSI colors (default)
-- `human` + `--plain` — no ANSI colors
-- `json` — compact JSON for piping
-- `json-pretty` — formatted JSON for debugging
-- `github` — `::error::`, `::warning::`, `::group::` annotations (if applicable)
+```php
+// Good — pure formatter
+class JsonFormatter
+{
+    public function format(ResultInterface $result): string
+    {
+        return json_encode($result->toArray(), JSON_THROW_ON_ERROR);
+    }
+}
+```
 
-### Shared Formatting Utilities
-Extract common formatting utilities into traits:
+### Validation is Not Business Logic
+Extract validation rules into dedicated classes:
+- **Form Requests** (Laravel) — `CreateUserRequest`
+- **DTOs with validation** — `UserData::fromArray($input)`
+- **Standalone validators** — `EmailValidator::assert($email)`
+
+### Side Effects Should Be Explicit
+If a method sends emails, writes files, or makes API calls, make it obvious:
 
 ```php
-trait BoxDrawer
-{
-    private function box(string $text): string { /* ... */ }
-    private function divider(int $width = 60): string { /* ... */ }
-}
+// Good — name reveals the side effect
+public function createAndNotify(UserData $data): User;
+
+// Bad — hidden side effect
+public function create(UserData $data): User;  // also sends email?
 ```
 
 ---
@@ -184,11 +309,11 @@ Services should receive dependencies via constructor, not instantiate them insid
 
 **Good:**
 ```php
-class ImportService
+class ReportGenerator
 {
     public function __construct(
-        private readonly CsvParser $parser,
-        private readonly DatabaseConnection $db,
+        private readonly PdfRenderer $pdf,
+        private readonly StorageInterface $storage,
     ) {}
 }
 ```
@@ -205,24 +330,25 @@ This allows instantiation without a DI container while still supporting injectio
 ### Avoid Service Locator Pattern
 Do not pass around a "bag of services" or a container. Pass only the specific dependencies needed.
 
----
+```php
+// Bad — unclear dependencies
+class InvoiceService
+{
+    public function __construct(private Container $container) {}
 
-## Auto-Discovery
+    public function generate(): void
+    {
+        $pdf = $this->container->get(PdfRenderer::class);  // hidden dependency
+        // ...
+    }
+}
 
-### Command Auto-Discovery
-The application entry point should auto-discover commands from a designated directory instead of manually registering them.
-
-**Requirements for auto-discovered commands:**
-1. Located in the commands directory (e.g., `src/Command/`)
-2. Class name ends with `Command`
-3. Extends the framework's base Command class
-4. Not abstract
-5. Has the framework's command attribute (e.g., `#[AsCommand]`)
-
-**Benefits:**
-- Adding a new command requires creating one file — no entry point changes
-- Eliminates merge conflicts in the entry point
-- Self-documenting: all commands live in one place
+// Good — explicit dependencies
+class InvoiceService
+{
+    public function __construct(private PdfRenderer $pdf) {}
+}
+```
 
 ---
 
@@ -234,23 +360,272 @@ Before extracting, identify duplication via tools like `phpcpd`. Common duplicat
 - Source directory iteration
 - Box/divider rendering in formatters
 - Error message formatting
+- Array transformation patterns
+- Database query conditions
 
 ### SRP (Single Responsibility Principle)
 Each class should have one reason to change:
-- **Commands** change when CLI options change
+- **Controllers** change when request/response format changes
 - **Services** change when business logic changes
 - **Formatters** change when output format changes
 - **Validators** change when validation criteria change
+- **Repositories** change when data access logic changes
 
 ### Consistent Naming
 Follow these conventions:
 | Pattern | Example |
 |---------|---------|
 | Commands | `*Command` suffix, in `Command\` namespace |
+| Controllers | `*Controller` suffix |
 | Services | `*Service` suffix, in `Service\` namespace |
+| Repositories | `*Repository` suffix |
 | Formatters | `*Formatter` suffix, in `Output\` namespace |
 | Interfaces | `*Interface` suffix |
 | Traits | Descriptive noun, no suffix |
+| Enums | TitleCase keys: `Active`, `Pending`, `Archived` |
+
+### Use Enums, Avoid Hardcoded Strings
+Replace magic strings and hardcoded values with typed Enums. This prevents typos, enables IDE autocompletion, and makes invalid states unrepresentable.
+
+**Before (bad — stringly typed, error-prone):**
+```php
+class Payment
+{
+    public function __construct(
+        public string $status,
+    ) {}
+}
+
+// Any string is accepted — typos pass silently
+$payment = new Payment(status: 'pending');
+
+if ($payment->status === 'completed') { /* ... */ }
+```
+
+**After (good — type-safe, exhaustive):**
+```php
+enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Completed = 'completed';
+    case Failed = 'failed';
+}
+
+class Payment
+{
+    public function __construct(
+        public PaymentStatus $status,
+    ) {}
+}
+
+// Invalid states are caught by the type system
+$payment = new Payment(status: PaymentStatus::Pending);
+
+if ($payment->status === PaymentStatus::Completed) { /* ... */ }
+```
+
+**Benefits:**
+- **Type safety** — only valid states are representable
+- **IDE support** — autocompletion prevents typos
+- **Exhaustive checking** — `match` expressions enforce handling all cases:
+  ```php
+  $label = match ($status) {
+      PaymentStatus::Pending => 'Awaiting payment',
+      PaymentStatus::Completed => 'Payment received',
+      PaymentStatus::Failed => 'Payment failed',
+  };
+  ```
+- **Refactoring safety** — renaming a case updates all references
+
+**Enum Methods for Improved Usability:**
+PHP enums can define methods that encapsulate behavior directly on the cases. This keeps logic close to the data it operates on and eliminates scattered `match` expressions throughout the codebase.
+
+```php
+enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Completed = 'completed';
+    case Failed = 'failed';
+    case Refunded = 'refunded';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Pending => 'Awaiting payment',
+            self::Completed => 'Payment received',
+            self::Failed => 'Payment failed',
+            self::Refunded => 'Payment refunded',
+        };
+    }
+
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pending => 'yellow',
+            self::Completed => 'green',
+            self::Failed => 'red',
+            self::Refunded => 'blue',
+        };
+    }
+
+    public function isFinal(): bool
+    {
+        return in_array($this, [self::Completed, self::Failed, self::Refunded], true);
+    }
+
+    public function badge(): string
+    {
+        return sprintf('<span class="badge bg-%s">%s</span>', $this->color(), $this->label());
+    }
+}
+
+// Usage — logic lives on the enum, not scattered in views/services
+$status = PaymentStatus::Completed;
+echo $status->label();    // 'Payment received'
+echo $status->color();    // 'green'
+echo $status->badge();    // '<span class="badge bg-green">Payment received</span>'
+
+if ($status->isFinal()) {
+    // No further transitions allowed
+}
+```
+
+**Static helper methods** are also useful for selects, validation, and filtering:
+
+```php
+enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Completed = 'completed';
+    case Failed = 'failed';
+    case Refunded = 'refunded';
+
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
+
+    public static function options(): array
+    {
+        return array_reduce(
+            self::cases(),
+            static fn (array $carry, self $status): array => $carry + [$status->value => $status->label()],
+            [],
+        );
+    }
+
+    public static function finalStatuses(): array
+    {
+        return array_filter(
+            self::cases(),
+            static fn (self $status): bool => $status->isFinal(),
+        );
+    }
+}
+
+// Usage
+PaymentStatus::values();          // ['pending', 'completed', 'failed', 'refunded']
+PaymentStatus::options();         // ['pending' => 'Awaiting payment', ...]
+PaymentStatus::finalStatuses();   // [Completed, Failed, Refunded]
+```
+
+**Benefits of enum methods:**
+- **Single source of truth** — labels, colors, and behavior live on the enum itself
+- **No scattered match expressions** — consumers call `$status->label()` instead of duplicating `match` blocks
+- **Easy to extend** — add a new method once, all consumers benefit immediately
+- **Testable in isolation** — enum methods are pure functions, trivial to unit test
+- **Blade/Filament-friendly** — `PaymentStatus::options()` feeds directly into dropdowns, tables, and filters
+
+**When to use Enums:**
+- Status codes (order status, payment status, job status)
+- Type discriminators (user type, notification type, event type)
+- Feature flags or toggles
+- Configuration values with a fixed set of options
+
+**When NOT to use Enums:**
+- Free-text user input (use strings with validation)
+- Values that change at runtime (use database lookups)
+- Values that need to be configurable per environment
+
+### Strict Typing
+Always use strict typing at the head of a `.php` file:
+```php
+<?php
+declare(strict_types=1);
+```
+
+Always use explicit return type declarations and the appropriate type hints for method parameters.
+
+### Control Structures
+Always use curly braces for control structures, even if it has one line:
+```php
+// Good
+if ($value === null) {
+    return;
+}
+
+// Bad — error-prone
+if ($value === null)
+    return;
+```
+
+### Lambdas and Closures
+Lambdas not using `$this` should be `static`:
+```php
+$filtered = array_filter(
+    $items,
+    static fn (Item $item): bool => $item->isActive(),
+);
+```
+
+### Import Classes and Namespaces
+Always import classes with `use` statements at the top of the file. Never use fully qualified class names (FQCN) inline in the code.
+
+**Before (bad — hard to read, verbose):**
+```php
+<?php
+
+namespace App\Service;
+
+class UserImporter
+{
+    public function import(): \App\Models\User
+    {
+        $validator = new \App\Validators\EmailValidator();
+        $repository = new \App\Repositories\UserRepository();
+        // ...
+    }
+}
+```
+
+**After (good — clean, readable):**
+```php
+<?php
+
+namespace App\Service;
+
+use App\Models\User;
+use App\Repositories\UserRepository;
+use App\Validators\EmailValidator;
+
+class UserImporter
+{
+    public function import(): User
+    {
+        $validator = new EmailValidator();
+        $repository = new UserRepository();
+        // ...
+    }
+}
+```
+
+**Benefits:**
+- Improves readability — short names are easier to scan
+- Makes refactoring safer — change the import, not every inline reference
+- Reduces visual noise and line length
+- Helps IDEs provide better autocompletion and navigation
+
+**Exception:** FQCN is acceptable inside PHPDoc blocks when documenting generic types or relationship return types for static analysis tools.
 
 ---
 
@@ -429,7 +804,7 @@ if ($tool === null) {
 }
 ```
 
-### Return Meaningful Exit Codes
+### Return Meaningful Exit Codes (CLI/Github Actions)
 | Code | Meaning |
 |------|---------|
 | `0` | Success / all operations passed |
@@ -445,6 +820,59 @@ if ($projectRoot === null) {
 }
 ```
 
+### Typed Exceptions
+Use specific exception types rather than generic `\Exception`:
+
+```php
+class ValidationException extends \RuntimeException {}
+class NotFoundException extends \RuntimeException {}
+class PaymentFailedException extends \RuntimeException {}
+```
+
+---
+
+## CLI-Specific Patterns
+
+### Thin Command Pattern
+Commands must be **ultra-thin orchestrators**. They should:
+- Accept input and resolve context (project root, arguments, options)
+- Delegate all business logic to dedicated services
+- Format and output results
+- Return exit codes
+
+**Maximum recommended command length**: 60 lines. If a command exceeds this, extract logic into a service.
+
+### Shared Command Concerns
+Extract cross-cutting concerns into a trait or base class:
+- `--path` / `--format` / `--plain` option definitions
+- Project root resolution
+- Result formatting
+
+Never duplicate option definitions or path resolution logic across commands.
+
+### Support All Output Formats
+Every command that produces structured output should support:
+- `human` — terminal-friendly with ANSI colors (default)
+- `human` + `--plain` — no ANSI colors
+- `json` — compact JSON for piping
+- `json-pretty` — formatted JSON for debugging
+- `github` — `::error::`, `::warning::`, `::group::` annotations (if applicable)
+
+### Command Auto-Discovery
+The application entry point should auto-discover commands from a designated directory instead of manually registering them.
+
+**Requirements for auto-discovered commands:**
+1. Located in the commands directory (e.g., `src/Command/`)
+2. Class name ends with `Command`
+3. Extends the framework's base Command class
+4. Not abstract
+5. Has the framework's command attribute (e.g., `#[AsCommand]`)
+
+**Benefits:**
+- Adding a new command requires creating one file — no entry point changes
+- Eliminates merge conflicts in the entry point
+- Self-documenting: all commands live in one place
+
 ---
 
 ## Framework-Specific Notes
@@ -455,12 +883,17 @@ if ($projectRoot === null) {
 - Leverage `SymfonyStyle` for interactive I/O
 - Use `InputOption` and `InputArgument` for type-safe input
 
-### Laravel Artisan
-- Place commands in `app/Console/Commands/`
-- Use `php artisan make:command` scaffolding
-- Register in `$commands` array within `Console\Kernel` (or auto-discover)
-- Leverage Laravel's service container for dependency injection
-- Use `$this->info()`, `$this->error()`, `$this->table()` helpers
+### Laravel
+- **Commands**: Place in `app/Console/Commands/`, use `php artisan make:command`
+- **Controllers**: Keep thin, delegate to services
+- **Models**: Use `casts()` method over `$casts` property (Laravel 12+)
+- **Database**: Avoid `DB::`; prefer `Model::query()`. Prevent N+1 with eager loading
+- **Relationships**: Always use proper Eloquent relationship methods with return type hints
+- **Tests**: Use Pest. Run with `php artisan test --compact`
+- **Code Style**: Run `vendor/bin/pint --dirty --format agent` before committing
+- **Routing**: Prefer named routes and the `route()` function; never hardcode URLs
+- **Queue**: Use `ShouldQueue` for time-consuming operations
+- **Auth**: Use built-in gates, policies, Sanctum
 
 ### Tempest Console
 - Use `#[ConsoleCommand]` attributes
@@ -505,14 +938,16 @@ app/
 │   │   ├── ImportCommand.php
 │   │   └── ExportCommand.php
 │   └── Kernel.php        # Command registration & scheduling
+├── Http/
+│   ├── Controllers/      # Thin controllers
+│   └── Requests/         # Form request validation
+├── Models/               # Eloquent models
 ├── Services/             # Business logic
 │   ├── ImportService.php
 │   └── ExportService.php
+├── Repositories/         # Data access abstraction
 ├── Formatters/           # Output formatters
-│   ├── HumanFormatter.php
-│   └── JsonFormatter.php
 └── Resolvers/            # Path/config resolution
-    └── ProjectResolver.php
 ```
 
 ### Package / Library Structure
@@ -528,41 +963,132 @@ src/
 
 ---
 
-## Checklist for New Commands
+## Other Considerations
 
-When adding a new command, verify:
+- Always use strict typing at the head of a `.php` file: `declare(strict_types=1);`.
+- Don't include any superfluous PHP Annotations, except ones that start with `@` for typing variables
 
-- [ ] Command class is in the designated commands directory and has the framework's command attribute
-- [ ] Uses a shared trait or base class for standard options
-- [ ] Does not exceed 60 lines of logic (extract services if needed)
-- [ ] Delegates all business logic to services
-- [ ] Returns structured result objects (not raw strings)
-- [ ] Supports `--format` option (human, json, json-pretty, github if applicable)
-- [ ] Supports `--plain` option (no ANSI colors)
-- [ ] Validates inputs early and returns `Command::FAILURE` on invalid input
-- [ ] Will be auto-discovered by the application entry point (no manual registration needed)
-- [ ] Has corresponding formatter(s) if producing new output types
+### PHPDoc for Model Properties
+Every model/entity class MUST declare all its properties in a class-level PHPDoc block with correct types. This enables static analysis tools (PHPStan, Psalm) to understand dynamic properties and provides IDE autocompletion.
 
----
+**Good — fully documented model:**
+```php
+<?php
 
-## File Organization
+declare(strict_types=1);
 
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $email
+ * @property \Carbon\Carbon $created_at
+ * @property \Carbon\Carbon $updated_at
+ */
+class User extends Model
+{
+    protected $fillable = ['name', 'email'];
+}
 ```
-src/ (or app/)
-├── Command/          # CLI commands (orchestrators only)
-│   ├── ImportCommand.php
-│   ├── ExportCommand.php
-│   └── CommandDiscovery.php
-├── Service/          # Business logic services
-│   ├── ServiceInterface.php
-│   ├── ImportService.php
-│   └── ExportService.php
-├── Output/           # Result formatters
-│   ├── BoxDrawer.php
-│   ├── HumanFormatter.php
-│   ├── JsonFormatter.php
-│   └── GithubFormatter.php
-├── Result.php        # Aggregate results
-├── ProjectResolver.php
-└── ProcessRunner.php
+
+**Bad — no PHPDoc, static analysis is blind:**
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected $fillable = ['name', 'email'];
+}
 ```
+
+**Rules:**
+- Include `@property` for every database column, including timestamps and soft-delete columns
+- Use nullable types when a column can be null: `@property ?string $deleted_at`
+- Use union types for columns with multiple possible types: `@property int|string $status`
+- Use full FQCN for non-scalar types: `@property \Carbon\Carbon $created_at`, `@property \App\Models\Company $company`
+- For relationships, document the return type on the method itself, not as a property:
+  ```php
+  use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+  /**
+   * @return BelongsTo<Company, $this>
+   */
+  public function company(): BelongsTo
+  {
+      return $this->belongsTo(Company::class);
+  }
+  ```
+
+This applies to all ORM models, DTOs, and any class with dynamic or non-promoted properties.
+- Use PHP 8 constructor property promotion in `__construct()`
+- Do not allow empty `__construct()` methods with zero parameters unless the constructor is private
+- Always use curly braces for control structures, even if it has one line.
+- Always use explicit return type declarations for methods and functions.
+- Use appropriate PHP type hints for method parameters.
+- Lambdas not using `$this` that should be `static`. Simple example: `static fn (int $x): int => $x+1;`
+- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless there is something very complex going on.
+- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed
+- For Laravel:
+    - Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.).
+        - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior
+    - Use queued jobs for time-consuming operations with the `ShouldQueue` interface
+    - Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum, etc.)
+    - When generating links to other pages, prefer named routes and the `route()` function
+        - Never add hardcoded URLs
+    - Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins
+    - Database:
+        - Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing them
+        - Generate code that prevents N+1 query problems by using eager loading
+        - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
+        - Laravel 12+ allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10)`
+    - Models:
+        - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models
+        - When creating new models, create useful factories and seeders for them too
+    - Code format:
+        - You must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
+        - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues
+    - Tests:
+        - All tests must be written using Pest. Use `php artisan make:test --pest {name}`.
+        - You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files - these are core to the application.
+        - Tests should test all of the happy paths, failure paths, and weird paths.
+        - Tests live in the `tests/Feature` and `tests/Unit` directories
+        - To run all tests: `php artisan test --compact`
+        - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file)
+        - Use datasets in Pest to simplify tests that have a lot of duplicated data
+        - Mocking can be very helpful when appropriate
+        - Browser testing is incredibly powerful and useful for this project.
+        - Browser tests should live in `tests/Browser/`
+    - FilamentPHP:
+        - Always use Filament-specific Artisan commands to create files. Find available commands with the `php artisan --help` command
+        - Patterns:
+            - Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values
+            - Use `Get $get` to read other form field values for conditional logic, like `->visible(fn (Get $get): bool => $get('type') === 'business')`
+            - Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates
+            - Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`
+            - Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name
+            - Use `state()` with a `Closure` to compute derived column values
+            - Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic
+            - **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields
+            - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed
+            - **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved
+                - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
+                - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
+                - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
+        - Correct Namespaces
+            - Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
+            - Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
+            - Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
+            - Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
+            - Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
+            - Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
+            - Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
+            - Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
