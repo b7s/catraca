@@ -995,27 +995,28 @@ The application entry point should auto-discover commands from a designated dire
 
 ### Laravel
 - **Commands**: Place in `app/Console/Commands/`, use `php artisan make:command`
-    - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior
+  - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior
 - **Controllers**: Keep thin, delegate to services
 - **Models**: Use `casts()` method over `$casts` property (Laravel 12+)
-    - When creating new models, create useful factories and seeders for them too
+  - When creating new models, create useful factories and seeders for them too
 - **Database**: Avoid `DB::`; prefer `Model::query()`. Prevent N+1 with eager loading
-    - When modifying a column, the migration must include all the attributes previously defined on the column. Otherwise, they will be dropped and lost.
-    - Laravel 12+ allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10)`
+  - When modifying a column, the migration must include all the attributes previously defined on the column. Otherwise, they will be dropped and lost.
+  - Laravel 12+ allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10)`
 - **Relationships**: Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins
 - **Routing**: Prefer named routes and the `route()` function; never hardcode URLs
 - **Queue**: Use `ShouldQueue` for time-consuming operations
 - **Auth**: Use built-in gates, policies, Sanctum
 - **Code Style**: Run `vendor/bin/pint --dirty --format agent` before committing. Do not run `--test` mode — simply run it to fix formatting issues
 - **Tests**: All tests must be written using Pest. Use `php artisan make:test --pest {name}`
-    - Tests should test all the happy paths, failure paths, and weird paths
-    - To run all tests: `php artisan test --compact`
-    - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file)
-    - Use datasets in Pest to simplify tests that have a lot of duplicated data
-    - Mocking can be very helpful when appropriate
-    - Browser testing is incredibly powerful and useful for this project. Browser tests should live in `tests/Browser/`
-    - You must not remove any tests or test files from the tests directory without approval
-    - Check documentation when needed: https://pestphp.com/docs/
+  - Tests should test all the happy paths, failure paths, and weird paths
+  - To run all tests: `php artisan test --compact`
+  - To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file)
+  - Use datasets in Pest to simplify tests that have a lot of duplicated data
+  - Mocking can be very helpful when appropriate
+  - Browser testing is incredibly powerful and useful for this project. Browser tests should live in `tests/Browser/`
+  - You must not remove any tests or test files from the tests directory without approval
+  - Ensure that tests are running in a test environment and on a test database. Never delete the project database
+  - Check documentation when needed: https://pestphp.com/docs/
 
 ### Tempest Console
 - Use `#[ConsoleCommand]` attributes
@@ -1103,25 +1104,25 @@ This applies to all ORM models, DTOs, and any class with dynamic or non-promoted
 ### FilamentPHP
 - Always use Filament-specific Artisan commands to create files. Find available commands with the `php artisan --help` command
 - Patterns:
-    - Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values
-    - Use `Get $get` to read other form field values for conditional logic, like `->visible(fn (Get $get): bool => $get('type') === 'business')`
-    - Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates
-    - Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`
-    - Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name
-    - Use `state()` with a `Closure` to compute derived column values
-    - Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic
-    - **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields
-    - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed
-    - **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved
-        - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
-        - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
-        - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
+  - Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values
+  - Use `Get $get` to read other form field values for conditional logic, like `->visible(fn (Get $get): bool => $get('type') === 'business')`
+  - Use `Set $set` inside `->afterStateUpdated()` on a `->live()` field to mutate another field reactively. Prefer `->live(onBlur: true)` on text inputs to avoid per-keystroke updates
+  - Compose layout by nesting `Section` and `Grid`. Children need explicit `->columnSpan()` or `->columnSpanFull()`
+  - Use `Repeater` for inline `HasMany` management. `->relationship()` with no args binds to the relationship matching the field name
+  - Use `state()` with a `Closure` to compute derived column values
+  - Use `SelectFilter` for enum or relationship filters, and `Filter` with a `->query()` closure for custom logic
+  - **Never add `->dehydrated(false)` to fields that need to be saved.** It strips the value from form state before `->action()` or the save handler runs. Only use it for helper/UI-only fields
+  - **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed
+  - **Use correct property types when overriding `Page`, `Resource`, and `Widget` properties.** These properties have union types or changed modifiers that must be preserved
+    - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
+    - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
+    - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
 - Correct Namespaces
-    - Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
-    - Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
-    - Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
-    - Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
-    - Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
-    - Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
-    - Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
-    - Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
+  - Form fields (`TextInput`, `Select`, `Repeater`, etc.): `Filament\Forms\Components\`
+  - Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
+  - Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
+  - Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
+  - Table columns (`TextColumn`, `IconColumn`, etc.): `Filament\Tables\Columns\`
+  - Table filters (`SelectFilter`, `Filter`, etc.): `Filament\Tables\Filters\`
+  - Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
+  - Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
