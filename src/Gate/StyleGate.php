@@ -20,10 +20,10 @@ use function is_int;
 use function is_string;
 use function sprintf;
 
-class StyleGate implements GateInterface
+readonly class StyleGate implements GateInterface
 {
     public function __construct(
-        private readonly SourcePathResolver $pathResolver = new SourcePathResolver,
+        private SourcePathResolver $pathResolver = new SourcePathResolver,
     ) {}
 
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult

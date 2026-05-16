@@ -9,10 +9,7 @@ use B7S\Catraca\Enum\Status;
 readonly class GateResult
 {
     /**
-     * @param  array<mixed, mixed>|null  $baseline
-     * @param  array<mixed, mixed>|null  $current
      * @param  array<array{type: ActionType, message: string, files?: array<int, string>}>|null  $actions
-     * @param  array<mixed, mixed>|null  $details
      */
     public function __construct(
         public Status $status,

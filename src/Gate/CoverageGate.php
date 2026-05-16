@@ -137,7 +137,7 @@ class CoverageGate implements GateInterface
             return null;
         }
 
-        $xml = @simplexml_load_file($path);
+        $xml = @simplexml_load_string(file_get_contents($path));
         if ($xml === false) {
             return null;
         }

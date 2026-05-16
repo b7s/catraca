@@ -7,10 +7,10 @@ use RuntimeException;
 use function is_string;
 use function sprintf;
 
-class ToolResolver
+readonly class ToolResolver
 {
     public function __construct(
-        private readonly string $projectRoot,
+        private string $projectRoot,
     ) {}
 
     public function getProjectRoot(): string

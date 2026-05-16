@@ -21,9 +21,9 @@ use function sprintf;
 
 class ComplexityGate implements GateInterface
 {
-    private const BLOCK_AT = 50;
+    private const int BLOCK_AT = 50;
 
-    private const WARN_AT = 20;
+    private const int WARN_AT = 20;
 
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {

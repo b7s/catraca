@@ -120,7 +120,7 @@ class CheckResult
     public function toArray(): array
     {
         return [
-            'schema' => 'catraca/v1',
+            'schema' => Baseline::SCHEMA,
             'result' => $this->isPass() ? 'pass' : 'fail',
             'timestamp' => $this->timestamp->format(DateTimeInterface::ATOM),
             'summary' => [

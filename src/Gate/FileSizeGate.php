@@ -9,6 +9,7 @@ use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
+use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -68,7 +69,7 @@ class FileSizeGate implements GateInterface
     private function scanDirectory(string $dir, int $maxLines, array &$oversized, string $root): void
     {
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
         );
 
         foreach ($iterator as $file) {

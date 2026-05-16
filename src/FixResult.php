@@ -50,7 +50,7 @@ class FixResult
     public function toArray(): array
     {
         return [
-            'schema' => 'catraca/v1',
+            'schema' => Baseline::SCHEMA,
             'type' => 'fix',
             'timestamp' => $this->timestamp->format(DateTimeInterface::ATOM),
             'summary' => [
