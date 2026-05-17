@@ -20,7 +20,7 @@ class JsonFormatter
             $fixAction = [
                 'type' => ActionType::RunFix->value,
                 'priority' => 0,
-                'message' => 'Run ./vendor/bin/catraca fix to auto-fix code style and performance issues',
+                'message' => 'Run `./vendor/bin/catraca fix` to auto-fix code style and performance issues',
                 'files' => [],
                 'reasons' => [],
             ];
@@ -32,8 +32,6 @@ class JsonFormatter
             }
         }
 
-        $encoded = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($asPretty ? JSON_PRETTY_PRINT : 0));
-
-        return $encoded."\n";
+        return json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($asPretty ? JSON_PRETTY_PRINT : 0))."\n";
     }
 }

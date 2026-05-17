@@ -74,7 +74,7 @@ class Baseline
     {
         $this->write([
             'schema' => self::SCHEMA,
-            'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ATOM),
+            'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ISO8601_EXPANDED),
             'source_dirs' => ['paths' => self::DEFAULT_SOURCE_DIRS],
             'security' => ['advisories' => null],
             'style' => ['violations' => 0],

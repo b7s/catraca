@@ -19,7 +19,7 @@ This document captures architectural patterns, best practices, and design decisi
 
 ---
 
-## Class Design Principles
+## Design Principles
 
 ### Single Responsibility
 Every class should have one reason to change. If a class handles input parsing, business logic, and output formatting, split it.
@@ -264,7 +264,7 @@ readonly class PaymentResult
 When creating a new result type, mirror the structure of existing result types in the project. Maintain consistency in:
 - Count methods (`get*Count()`)
 - Status methods (`isSuccess()`, `isPass()`)
-- Serialization (`toArray()`, `toJson()`,)
+- Serialization (`toArray()`, `toJson()`)
 
 ---
 
@@ -577,6 +577,7 @@ const API_VERSION = 'v2';
 const int MAX_RETRIES = 3;
 const string API_VERSION = 'v2';
 const Status DEFAULT_STATUS = Status::Pending;
+const array ITEMS = ['one', 'two'];
 ```
 
 **Class constants:**

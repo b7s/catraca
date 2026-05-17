@@ -84,7 +84,7 @@ readonly class StyleGate implements GateInterface
                 $files = array_values(array_map(static fn (string $f): string => trim($f), $dirtyFiles));
             } else {
                 $violations = 1;
-                $files[] = 'Run `pint --test` for details or fix with `pint --dirty --format agent`';
+                $files[] = 'Run `pint --test` for details or fix with `pint`';
             }
         }
 
