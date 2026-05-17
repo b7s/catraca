@@ -2,6 +2,7 @@
 
 namespace B7S\Catraca\Gate;
 
+use B7S\Catraca\Analyzer\ConditionOrderAnalyzer;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\CsFixerResultParser;
 use B7S\Catraca\Enum\ActionType;
@@ -13,7 +14,9 @@ use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
+use function array_merge;
 use function array_slice;
+use function count;
 use function is_array;
 use function is_int;
 use function sprintf;
@@ -60,6 +63,16 @@ readonly class PerformanceGate implements GateInterface
                 if ($autoloadResult['violations'] > 0) {
                     $messages[] = $autoloadResult['message'];
                 }
+            }
+        }
+
+        if ($enabledRules['condition_order'] ?? true) {
+            $conditionResult = $this->checkConditionOrder($paths);
+            $hasTool = true;
+            $violations += $conditionResult['violations'];
+            $files = array_merge($files, $conditionResult['files']);
+            if ($conditionResult['violations'] > 0) {
+                $messages[] = $conditionResult['message'];
             }
         }
 
@@ -239,6 +252,35 @@ readonly class PerformanceGate implements GateInterface
             'violations' => 0,
             'files' => [],
             'message' => '',
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $paths
+     * @return array{violations: int, files: array<int, string>, message: string}
+     */
+    private function checkConditionOrder(array $paths): array
+    {
+        $analyzer = new ConditionOrderAnalyzer;
+        $violations = $analyzer->analyze($paths);
+
+        if ($violations === []) {
+            return [
+                'violations' => 0,
+                'files' => [],
+                'message' => '',
+            ];
+        }
+
+        $files = [];
+        foreach ($violations as $v) {
+            $files[] = $v['file'].':'.$v['line'];
+        }
+
+        return [
+            'violations' => count($violations),
+            'files' => $files,
+            'message' => sprintf('%d condition order issues — cheaper conditions should come first', count($violations)),
         ];
     }
 

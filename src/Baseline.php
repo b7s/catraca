@@ -98,6 +98,7 @@ class Baseline
                     'random_api_migration' => true,
                     'set_type_to_cast' => true,
                     'autoload_optimization' => true,
+                    'condition_order' => true,
                 ],
             ],
             'file_size' => ['max_lines' => 1000],
