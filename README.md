@@ -150,7 +150,7 @@ vendor/bin/catraca check --path=/path/to/project
 vendor/bin/catraca check --fix
 ```
 
-> **AI Agent Detection:** When Catraca detects it is running inside an AI agent (Cursor, Claude Code, OpenCode, Gemini CLI, etc.), it automatically switches to `--format=json` for structured output. You can still override this by explicitly passing `--format`.
+> **AI Agent Detection:** When Catraca detects it is running inside an AI agent (Cursor, Claude Code, OpenCode, etc.), it automatically switches to `--format=json` for structured output. You can still override this by explicitly passing `--format`.
 
 ### `catraca fix` — Auto-fix issues
 
@@ -196,7 +196,7 @@ Terminal-friendly output with ANSI colors:
   ✔ Code Style              PASS     0 violations (baseline: 0)
   ✘ Static Analysis         FAIL     3 errors (baseline: 0)
   ✔ Test Coverage           PASS     85.00% (baseline: 85.00%)
-  ✘ Duplication             FAIL     5.20% (baseline: 2.00%, 2 clones)
+  ✘ Duplication             FAIL     5.22% (baseline: 2.00%, 2 clones)
   ✔ File Size               PASS     0 files exceed 1000 lines
   ✔ Cyclomatic Complexity   PASS     max CCN 8, 0 violations (>50), 1 warnings (>20)
   ✔ Performance             PASS     No performance improvements needed
