@@ -1,4 +1,4 @@
-.PHONY: help install test test-unit test-types test-coverage test-plugin release
+.PHONY: help install check test test-unit test-types test-coverage test-plugin release
 
 RELEASE_VERSION := $(if $(VERSION),$(VERSION),$(version))
 RELEASE_MESSAGE := $(if $(MESSAGE),$(MESSAGE),$(message))
@@ -7,7 +7,8 @@ RELEASE_MESSAGE := $(if $(MESSAGE),$(MESSAGE),$(message))
 help:
 	@echo "Available commands:"
 	@echo "  make install         - Install dependencies"
-	@echo "  make release version=x.y.z message='msg' - Run tests and create Git tag"
+	@echo "  make check           - Run quality gates (./bin/catraca)"
+	@echo "  make release version=x.y.z message='msg' - Run quality gates and create Git tag"
 	@echo "  make clean           - Clean cache and temporary files"
 
 # Install dependencies
@@ -16,8 +17,13 @@ install:
 	composer install
 	@echo "✅ Installation complete!"
 
+# Run quality gates
+check:
+	@echo "🔍 Running quality gates..."
+	@./bin/catraca
+
 # Create a tagged release (auto-commits changes if any)
-release:
+release: check
 	@if [ -f version ]; then \
 		LAST_VERSION=$$(cat version); \
 		echo "📌 Last version: v$$LAST_VERSION"; \
