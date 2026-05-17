@@ -562,6 +562,91 @@ declare(strict_types=1);
 
 Always use explicit return type declarations and the appropriate type hints for method parameters.
 
+### Explicit Types for Constants, Properties, and Parameters
+
+Always declare explicit types. Every constant, property, and parameter must have a declared type. Never rely on inference or implicit coercion.
+
+**Typed constants (PHP 8.3+):**
+
+```php
+// Bad — type inferred from value, no static analysis guarantee
+const MAX_RETRIES = 3;
+const API_VERSION = 'v2';
+
+// Good — explicit type
+const int MAX_RETRIES = 3;
+const string API_VERSION = 'v2';
+const Status DEFAULT_STATUS = Status::Pending;
+```
+
+**Class constants:**
+
+```php
+class ApiConfig
+{
+    // Bad
+    public const TIMEOUT = 30;
+    public const BASE_URL = 'https://api.example.com';
+
+    // Good
+    public const int TIMEOUT = 30;
+    public const string BASE_URL = 'https://api.example.com';
+}
+```
+
+**Typed properties:**
+
+```php
+class UserImporter
+{
+    // Bad — no type, accepts anything
+    private $logger;
+    private $timeout = 30;
+
+    // Good — every property is typed
+    private LoggerInterface $logger;
+    private int $timeout = 30;
+    private ?string $apiKey = null;
+}
+```
+
+**Typed parameters and return types:**
+
+```php
+// Bad — untyped parameters and return
+public function process($input, $options)
+{
+    // ...
+}
+
+// Good — every parameter typed, return type declared
+public function process(
+    array $input,
+    ImportOptions $options,
+): ImportResult {
+    // ...
+}
+```
+
+**Local variables (PHPDoc when ambiguous):**
+
+PHP does not support typed local variables inside methods. When a variable's type cannot be inferred by static analysis tools, annotate it with a PHPDoc block:
+
+```php
+/** @var array<int, User> $users */
+$users = $repository->findActive();
+
+/** @var ?string $cachedValue */
+$cachedValue = $cache->get('key');
+```
+
+**Why explicit types matter:**
+- **Static analysis** — PHPStan and Psalm verify correctness without running code
+- **IDE support** — autocompletion and inline error detection
+- **Refactoring safety** — changing a type surfaces all affected call sites immediately
+- **Self-documenting contracts** — signatures describe behavior without reading implementation
+- **Runtime safety** — `declare(strict_types=1)` combined with typed parameters rejects invalid input immediately
+
 ### Control Structures
 Always use curly braces for control structures, even if it has one line:
 ```php
