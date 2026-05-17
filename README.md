@@ -145,7 +145,12 @@ vendor/bin/catraca check --format=github
 
 # Specify project path
 vendor/bin/catraca check --path=/path/to/project
+
+# Auto-fix issues if any gate fails, then verify
+vendor/bin/catraca check --fix
 ```
+
+> **AI Agent Detection:** When Catraca detects it is running inside an AI agent (Cursor, Claude Code, OpenCode, Gemini CLI, etc.), it automatically switches to `--format=json` for structured output. You can still override this by explicitly passing `--format`.
 
 ### `catraca fix` — Auto-fix issues
 
@@ -156,6 +161,9 @@ vendor/bin/catraca fix
 
 # Specify project path
 vendor/bin/catraca fix --path=/path/to/project
+
+# Skip the automatic check after fixing
+vendor/bin/catraca fix --no-check
 ```
 
 What it fixes:
@@ -210,6 +218,8 @@ Terminal-friendly output with ANSI colors:
 
 Use `catraca check --format=json` to get structured JSON output for AI agents.
 If you want it formatted, use `catraca check --format=json-pretty`. Note: Consumes more AI agent tokens.
+
+Catraca auto-detects AI agents (Cursor, Claude Code, OpenCode, Gemini CLI, Codex, Augment, and others) and automatically uses JSON output — no flag needed.
 
 ```json
 {

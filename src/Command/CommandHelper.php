@@ -2,6 +2,7 @@
 
 namespace B7S\Catraca\Command;
 
+use B7S\Catraca\AgentDetector;
 use B7S\Catraca\CheckResult;
 use B7S\Catraca\FixResult;
 use B7S\Catraca\Output\FixHumanFormatter;
@@ -48,6 +49,10 @@ trait CommandHelper
     {
         /** @var string $format */
         $format = $input->getOption('format');
+
+        if ($format === 'human' && AgentDetector::isRunningInAgent()) {
+            return 'json';
+        }
 
         return $format;
     }

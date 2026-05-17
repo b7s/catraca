@@ -12,4 +12,5 @@ enum ActionType: string
     case Modularize = 'MODULARIZE';
     case FixSecurity = 'FIX SECURITY';
     case ImprovePerformance = 'IMPROVE PERFORMANCE';
+    case RunFix = 'RUN FIX';
 }

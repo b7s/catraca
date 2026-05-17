@@ -121,6 +121,7 @@ class CheckResult
     {
         return [
             'schema' => Baseline::SCHEMA,
+            'type' => 'check',
             'result' => $this->isPass() ? 'pass' : 'fail',
             'timestamp' => $this->timestamp->format(DateTimeInterface::ATOM),
             'summary' => [

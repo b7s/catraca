@@ -3,6 +3,7 @@
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Baseline;
+use B7S\Catraca\Catraca;
 use B7S\Catraca\Fixer\AutoloadFixer;
 use B7S\Catraca\Fixer\CodeStyleFixer;
 use B7S\Catraca\Fixer\FixerInterface;
@@ -13,6 +14,7 @@ use JsonException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
@@ -39,6 +41,7 @@ class FixCommand extends Command
     protected function configure(): void
     {
         $this->addStandardOptions();
+        $this->addOption('no-check', null, InputOption::VALUE_NONE, 'Skip running check after fix');
     }
 
     /**
@@ -61,6 +64,17 @@ class FixCommand extends Command
 
         $this->formatFixResult($input, $output, $result);
 
-        return Command::SUCCESS;
+        if ($input->getOption('no-check')) {
+            return Command::SUCCESS;
+        }
+
+        $output->writeln('');
+
+        $catraca = new Catraca($projectRoot);
+        $checkResult = $catraca->check();
+
+        $this->formatResult($input, $output, $checkResult);
+
+        return $checkResult->isPass() ? Command::SUCCESS : Command::FAILURE;
     }
 }
