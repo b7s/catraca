@@ -152,6 +152,69 @@ class Test {
         unlink($file);
     }
 
+    public function test_preserves_formatting_blank_lines_and_spacing(): void
+    {
+        $original = "<?php\n\ndeclare(strict_types=1);\n\nnamespace App;\n\nuse App\Service;\n\nclass Test {\n    public function run() {\n        // important comment\n        if (\$this->expensive() && \$x > 0) {\n            return true;\n        }\n\n        return false;\n    }\n}\n";
+        $file = $this->tmpDir.'/src/Test.php';
+        file_put_contents($file, $original);
+
+        $baseline = $this->createBaseline();
+        $resolver = new ToolResolver($this->tmpDir);
+        $fixer = new ConditionOrderFixer;
+
+        $result = $fixer->fix($baseline, $resolver);
+
+        self::assertTrue($result->fixed);
+
+        $content = file_get_contents($file);
+        self::assertStringContainsString('// important comment', $content);
+        self::assertStringContainsString('if ($x > 0 && $this->expensive())', $content);
+        self::assertStringContainsString('declare(strict_types=1);', $content);
+        self::assertStringContainsString('return false;', $content);
+
+        unlink($file);
+    }
+
+    public function test_adds_parens_around_coalesce_when_swapped(): void
+    {
+        $original = "<?php\n\n\$file->getExtension() === 'php' && (tryIt()->data ?? false);\n";
+        $file = $this->tmpDir.'/src/Test.php';
+        file_put_contents($file, $original);
+
+        $baseline = $this->createBaseline();
+        $resolver = new ToolResolver($this->tmpDir);
+        $fixer = new ConditionOrderFixer;
+
+        $result = $fixer->fix($baseline, $resolver);
+
+        self::assertTrue($result->fixed);
+
+        $content = file_get_contents($file);
+        self::assertStringContainsString('(tryIt()->data ?? false) && ($file->getExtension() === \'php\')', $content);
+
+        unlink($file);
+    }
+
+    public function test_adds_parens_around_ternary_when_swapped(): void
+    {
+        $original = "<?php\n\n\$this->expensive() && (\$x ? \$y : \$z);\n";
+        $file = $this->tmpDir.'/src/Test.php';
+        file_put_contents($file, $original);
+
+        $baseline = $this->createBaseline();
+        $resolver = new ToolResolver($this->tmpDir);
+        $fixer = new ConditionOrderFixer;
+
+        $result = $fixer->fix($baseline, $resolver);
+
+        self::assertTrue($result->fixed);
+
+        $content = file_get_contents($file);
+        self::assertStringContainsString('($x ? $y : $z) && ($this->expensive())', $content);
+
+        unlink($file);
+    }
+
     private function createBaseline(array $rules = ['condition_order' => true]): Baseline
     {
         $baseline = new Baseline($this->tmpDir);

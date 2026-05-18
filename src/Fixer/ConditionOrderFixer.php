@@ -8,10 +8,15 @@ use B7S\Catraca\Analyzer\ConditionOrderAnalyzer;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
+use PhpParser\Lexer\Emulative;
+use PhpParser\Node;
 use PhpParser\Node\Expr\BinaryOp\BooleanAnd;
 use PhpParser\Node\Expr\BinaryOp\BooleanOr;
 use PhpParser\NodeFinder;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\ParserFactory;
+use PhpParser\PhpVersion;
 use PhpParser\PrettyPrinter\Standard;
 use Throwable;
 
@@ -30,6 +35,23 @@ readonly class ConditionOrderFixer implements FixerInterface
     public function getLabel(): string
     {
         return 'Condition Order';
+    }
+
+    private function clearOrigNode(Node $node): void
+    {
+        $node->setAttribute('origNode', null);
+        foreach ($node->getSubNodeNames() as $name) {
+            $sub = $node->$name;
+            if (is_array($sub)) {
+                foreach ($sub as $item) {
+                    if ($item instanceof Node) {
+                        $this->clearOrigNode($item);
+                    }
+                }
+            } elseif ($sub instanceof Node) {
+                $this->clearOrigNode($sub);
+            }
+        }
     }
 
     public function fix(Baseline $baseline, ToolResolver $resolver): FixerResult
@@ -61,6 +83,7 @@ readonly class ConditionOrderFixer implements FixerInterface
         }
 
         $fixedCount = 0;
+        $lexer = new Emulative(PhpVersion::getHostVersion());
         $parser = (new ParserFactory)->createForHostVersion();
         $nodeFinder = new NodeFinder;
         $printer = new Standard;
@@ -72,14 +95,19 @@ readonly class ConditionOrderFixer implements FixerInterface
             }
 
             try {
-                $ast = $parser->parse($content);
+                $origAst = $parser->parse($content);
             } catch (Throwable) {
                 continue;
             }
 
-            if ($ast === null) {
+            if ($origAst === null) {
                 continue;
             }
+
+            $origTokens = $parser->getTokens();
+
+            $traverser = new NodeTraverser(new CloningVisitor);
+            $ast = $traverser->traverse($origAst);
 
             /** @var array<int, BooleanAnd|BooleanOr> $booleanOps */
             $booleanOps = array_merge(
@@ -97,9 +125,9 @@ readonly class ConditionOrderFixer implements FixerInterface
                 $rightCost = $analyzer->computeCost($op->right);
 
                 if ($leftCost > $rightCost) {
-                    $tmp = $op->left;
-                    $op->left = $op->right;
-                    $op->right = $tmp;
+                    [$op->left, $op->right] = [$op->right, $op->left];
+                    $this->clearOrigNode($op->left);
+                    $this->clearOrigNode($op->right);
                     $swapped = true;
                 }
             }
@@ -108,7 +136,7 @@ readonly class ConditionOrderFixer implements FixerInterface
                 continue;
             }
 
-            $newContent = $printer->prettyPrintFile($ast);
+            $newContent = $printer->printFormatPreserving($ast, $origAst, $origTokens);
             if ($newContent !== $content) {
                 file_put_contents($file, $newContent);
                 $fixedCount++;
