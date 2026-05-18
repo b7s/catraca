@@ -20,7 +20,7 @@ final class ConditionOrderFixerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/catraca_fixer_test_' . str_replace('.', '_', uniqid('', true));
+        $this->tmpDir = sys_get_temp_dir().'/catraca_fixer_test_'.str_replace('.', '_', uniqid('', true));
         mkdir($this->tmpDir.'/src', 0755, true);
     }
 
