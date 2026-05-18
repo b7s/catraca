@@ -55,7 +55,7 @@ class Test {
         unlink($file);
     }
 
-    public function test_skips_when_rule_disabled(): void
+    public function test_skips_when_check_disabled(): void
     {
         $file = $this->tmpDir.'/src/Test.php';
         file_put_contents($file, '<?php
@@ -73,7 +73,30 @@ class Test {
         $result = $fixer->fix($baseline, $resolver);
 
         self::assertTrue($result->skipped);
-        self::assertStringContainsString('disabled', $result->message);
+        self::assertStringContainsString('check disabled', $result->message);
+
+        unlink($file);
+    }
+
+    public function test_skips_when_fix_disabled(): void
+    {
+        $file = $this->tmpDir.'/src/Test.php';
+        file_put_contents($file, '<?php
+class Test {
+    public function run() {
+        if ($this->expensive() && $this->cheap) {}
+    }
+}
+');
+
+        $baseline = $this->createBaseline(['condition_order' => true], ['condition_order' => false]);
+        $resolver = new ToolResolver($this->tmpDir);
+        $fixer = new ConditionOrderFixer;
+
+        $result = $fixer->fix($baseline, $resolver);
+
+        self::assertTrue($result->skipped);
+        self::assertStringContainsString('fix disabled', $result->message);
 
         unlink($file);
     }
@@ -215,11 +238,11 @@ class Test {
         unlink($file);
     }
 
-    private function createBaseline(array $rules = ['condition_order' => true]): Baseline
+    private function createBaseline(array $rules = ['condition_order' => true], array $fixers = ['condition_order' => true]): Baseline
     {
         $baseline = new Baseline($this->tmpDir);
         $baseline->write([
-            'performance' => ['violations' => 0, 'rules' => $rules],
+            'performance' => ['violations' => 0, 'rules' => $rules, 'fixers' => $fixers],
         ]);
 
         return $baseline;

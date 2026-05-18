@@ -61,7 +61,16 @@ readonly class ConditionOrderFixer implements FixerInterface
             return new FixerResult(
                 label: $this->getLabel(),
                 skipped: true,
-                message: 'condition_order rule disabled',
+                message: 'condition_order check disabled',
+            );
+        }
+
+        $fixers = $baseline->get('performance', 'fixers', []);
+        if (! is_array($fixers) || ! ($fixers['condition_order'] ?? false)) {
+            return new FixerResult(
+                label: $this->getLabel(),
+                skipped: true,
+                message: 'condition_order fix disabled [experimental] — set performance.fixers.condition_order to true to enable',
             );
         }
 

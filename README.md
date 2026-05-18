@@ -104,21 +104,24 @@ You can edit `catraca_baseline.json` directly to adjust thresholds.
     "performance": {
         "violations": 0,
         "rules": {
-            "global_namespace_import": true,
-            "no_unused_imports": true,
-            "fully_qualified_strict_types": true,
-            "lambda_not_used_import": true,
-            "native_function_invocation": true,
-            "no_redundant_readonly_property": true,
-            "static_lambda": true,
-            "array_push": true,
-            "ereg_to_preg": true,
-            "modernize_strpos": true,
-            "pow_to_exponentiation": true,
-            "random_api_migration": true,
-            "set_type_to_cast": true,
-            "autoload_optimization": true,
-            "condition_order": true
+          "global_namespace_import": true,
+          "no_unused_imports": true,
+          "fully_qualified_strict_types": true,
+          "lambda_not_used_import": true,
+          "native_function_invocation": true,
+          "no_redundant_readonly_property": true,
+          "static_lambda": true,
+          "array_push": true,
+          "ereg_to_preg": true,
+          "modernize_strpos": true,
+          "pow_to_exponentiation": true,
+          "random_api_migration": true,
+          "set_type_to_cast": true,
+          "autoload_optimization": true,
+          "condition_order": true
+        },
+        "fixers": {
+            "condition_order": false
         }
     }
 }
@@ -277,25 +280,40 @@ Gates run in order. A failure blocks the PR.
 
 The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by default):
 
-| Rule | What it detects |
-|------|-----------------|
-| `global_namespace_import` | Missing `use class/const` statements |
-| `no_unused_imports` | Dead imports that slow parsing |
-| `fully_qualified_strict_types` | `\Foo\Bar` when `use Foo\Bar` already exists |
-| `lambda_not_used_import` | Closures importing variables they don't use |
-| `native_function_invocation` | Native function calls without `\` prefix optimization |
-| `no_redundant_readonly_property` | Redundant readonly property declarations |
-| `static_lambda` | Lambdas not using `$this` that should be `static` |
-| `array_push` | `array_push()` calls — use `$arr[] =` instead |
-| `ereg_to_preg` | Deprecated `ereg` function calls |
-| `modernize_strpos` | `strpos()` calls — use `str_contains`/`str_starts_with`/`str_ends_with` |
-| `pow_to_exponentiation` | `pow()` calls — use `**` operator instead |
-| `random_api_migration` | `rand()`/`mt_rand()` calls — use `random_int()` instead |
-| `set_type_to_cast` | `settype()` calls — use type casting instead |
-| `autoload_optimization` | Missing `composer dump-autoload -o` |
-| `condition_order` | Expensive conditions placed before cheaper ones in `&&` / `||` |
+| Rule                             | What it detects                                                         |
+|----------------------------------|-------------------------------------------------------------------------|
+| `global_namespace_import`        | Missing `use class/const` statements                                    |
+| `no_unused_imports`              | Dead imports that slow parsing                                          |
+| `fully_qualified_strict_types`   | `\Foo\Bar` when `use Foo\Bar` already exists                            |
+| `lambda_not_used_import`         | Closures importing variables they don't use                             |
+| `native_function_invocation`     | Native function calls without `\` prefix optimization                   |
+| `no_redundant_readonly_property` | Redundant readonly property declarations                                |
+| `static_lambda`                  | Lambdas not using `$this` that should be `static`                       |
+| `array_push`                     | `array_push()` calls — use `$arr[] =` instead                           |
+| `ereg_to_preg`                   | Deprecated `ereg` function calls                                        |
+| `modernize_strpos`               | `strpos()` calls — use `str_contains`/`str_starts_with`/`str_ends_with` |
+| `pow_to_exponentiation`          | `pow()` calls — use `**` operator instead                               |
+| `random_api_migration`           | `rand()`/`mt_rand()` calls — use `random_int()` instead                 |
+| `set_type_to_cast`               | `settype()` calls — use type casting instead                            |
+| `autoload_optimization`          | Missing `composer dump-autoload -o`                                     |
+| `condition_order`                | Expensive conditions placed before cheaper ones in `&&` / `||` (fixer is **experimental**) |
 
-All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it. Add new rules if needed.
+All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it, or `true` to enable it.
+
+The `condition_order` check is **enabled by default** — it detects expensive conditions placed before cheaper ones. However, the auto-fix is **disabled by default** and marked as **experimental** because it modifies source code using AST transformations. Review all changes before committing. To enable automatic fixing, set `performance.fixers.condition_order` to `true`:
+
+```json
+{
+    "performance": {
+        "rules": {
+            "condition_order": true
+        },
+        "fixers": {
+            "condition_order": true
+        }
+    }
+}
+```
 
 ### PHPStan Configuration
 

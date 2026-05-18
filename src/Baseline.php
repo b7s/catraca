@@ -100,6 +100,9 @@ class Baseline
                     'autoload_optimization' => true,
                     'condition_order' => true,
                 ],
+                'fixers' => [
+                    'condition_order' => false,
+                ],
             ],
             'file_size' => ['max_lines' => 1000],
             'complexity' => ['max_ccn' => 0],
