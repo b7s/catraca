@@ -6,6 +6,7 @@ use B7S\Catraca\Baseline;
 use B7S\Catraca\Catraca;
 use B7S\Catraca\Fixer\AutoloadFixer;
 use B7S\Catraca\Fixer\CodeStyleFixer;
+use B7S\Catraca\Fixer\ConditionOrderFixer;
 use B7S\Catraca\Fixer\FixerInterface;
 use B7S\Catraca\Fixer\PerformanceFixer;
 use B7S\Catraca\FixResult;
@@ -32,6 +33,7 @@ class FixCommand extends Command
     {
         parent::__construct();
         $this->fixers = [
+            new ConditionOrderFixer,
             new PerformanceFixer,
             new CodeStyleFixer,
             new AutoloadFixer,

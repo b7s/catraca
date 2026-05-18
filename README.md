@@ -117,7 +117,8 @@ You can edit `catraca_baseline.json` directly to adjust thresholds.
             "pow_to_exponentiation": true,
             "random_api_migration": true,
             "set_type_to_cast": true,
-            "autoload_optimization": true
+            "autoload_optimization": true,
+            "condition_order": true
         }
     }
 }
@@ -170,6 +171,7 @@ What it fixes:
 
 | Fixer | Tool | What it does |
 |-------|------|--------------|
+| Condition Order | Built-in | Swaps expensive conditions to come after cheaper ones in `&&` / `||` expressions |
 | Code Style | `pint` or `php-cs-fixer` | Fixes all code style violations |
 | Performance | `php-cs-fixer` | Adds missing imports, removes unused imports, cleans FQCNs, optimizes native calls and more |
 | Autoload | `composer` | Runs `composer dump-autoload -o` if not optimized |
@@ -291,6 +293,7 @@ The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by
 | `random_api_migration` | `rand()`/`mt_rand()` calls — use `random_int()` instead |
 | `set_type_to_cast` | `settype()` calls — use type casting instead |
 | `autoload_optimization` | Missing `composer dump-autoload -o` |
+| `condition_order` | Expensive conditions placed before cheaper ones in `&&` / `||` |
 
 All rules are configurable in `catraca_baseline.json` under `performance.rules`. Set any rule to `false` to disable it. Add new rules if needed.
 

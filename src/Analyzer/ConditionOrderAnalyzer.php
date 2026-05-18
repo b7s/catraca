@@ -43,7 +43,7 @@ readonly class ConditionOrderAnalyzer
         'is_writable', 'is_link', 'ctype_digit', 'ctype_alpha', 'ctype_alnum',
     ];
 
-    private const array SIDE_EFFECT_FUNCTIONS = [
+    public const array SIDE_EFFECT_FUNCTIONS = [
         'mkdir', 'rmdir', 'unlink', 'rename', 'copy', 'touch',
         'file_put_contents', 'fwrite', 'fclose', 'chmod', 'chown', 'chgrp',
         'symlink', 'link', 'opendir', 'closedir',
@@ -143,7 +143,7 @@ readonly class ConditionOrderAnalyzer
         return $files;
     }
 
-    private function computeCost(Node $node): int
+    public function computeCost(Node $node): int
     {
         return match (true) {
             $node instanceof Expr\Variable,
@@ -231,7 +231,7 @@ readonly class ConditionOrderAnalyzer
         return max($baseCost, max($argCosts));
     }
 
-    private function resolveFunctionName(Expr\FuncCall $node): ?string
+    public function resolveFunctionName(Expr\FuncCall $node): ?string
     {
         if (! $node->name instanceof Node\Name) {
             return null;
@@ -240,7 +240,7 @@ readonly class ConditionOrderAnalyzer
         return $node->name->getLast();
     }
 
-    private function hasSideEffects(BooleanAnd|BooleanOr $op): bool
+    public function hasSideEffects(BooleanAnd|BooleanOr $op): bool
     {
         $nodeFinder = new NodeFinder;
 
