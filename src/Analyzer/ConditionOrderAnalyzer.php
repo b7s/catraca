@@ -154,11 +154,15 @@ readonly class ConditionOrderAnalyzer
             $node instanceof Expr\Isset_ => 0,
             $node instanceof Expr\Empty_ => $this->computeCost($node->expr),
 
-            $node instanceof Expr\PropertyFetch,
-            $node instanceof Expr\ArrayDimFetch,
-            $node instanceof Expr\StaticPropertyFetch,
-            $node instanceof Expr\Array_,
-            $node instanceof Expr\NullsafePropertyFetch => 1,
+            $node instanceof Expr\PropertyFetch => max(1, $this->computeCost($node->var)),
+            $node instanceof Expr\NullsafePropertyFetch => max(1, $this->computeCost($node->var)),
+            $node instanceof Expr\StaticPropertyFetch => max(1, $this->computeCost($node->class)),
+            $node instanceof Expr\ArrayDimFetch => max(
+                1,
+                $this->computeCost($node->var),
+                $node->dim !== null ? $this->computeCost($node->dim) : 0,
+            ),
+            $node instanceof Expr\Array_ => 1,
 
             $node instanceof Expr\BinaryOp\Greater,
             $node instanceof Expr\BinaryOp\GreaterOrEqual,

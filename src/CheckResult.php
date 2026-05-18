@@ -49,8 +49,10 @@ class CheckResult
             if ($gate->actions === null) {
                 continue;
             }
-            $reasons = $this->extractReasons($gate->details);
+            $gateReasons = $this->extractReasons($gate->details);
             foreach ($gate->actions as $actionData) {
+                $actionReasons = $actionData['reasons'] ?? [];
+                $reasons = count($actionReasons) > 0 ? $actionReasons : $gateReasons;
                 $actions[] = new Action(
                     type: $actionData['type'],
                     message: $actionData['message'],

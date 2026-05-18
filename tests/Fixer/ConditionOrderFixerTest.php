@@ -200,7 +200,7 @@ class Test {
 
     public function test_adds_parens_around_coalesce_when_swapped(): void
     {
-        $original = "<?php\n\n\$file->getExtension() === 'php' && (tryIt()->data ?? false);\n";
+        $original = "<?php\n\n\$this->expensive() && (\$x ?? false);\n";
         $file = $this->tmpDir.'/src/Test.php';
         file_put_contents($file, $original);
 
@@ -213,7 +213,7 @@ class Test {
         self::assertTrue($result->fixed);
 
         $content = file_get_contents($file);
-        self::assertStringContainsString('(tryIt()->data ?? false) && ($file->getExtension() === \'php\')', $content);
+        self::assertStringContainsString('($x ?? false) && ($this->expensive())', $content);
 
         unlink($file);
     }

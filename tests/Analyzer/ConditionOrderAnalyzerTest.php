@@ -286,6 +286,24 @@ final class ConditionOrderAnalyzerTest extends TestCase
         unlink($file);
     }
 
+    public function test_does_not_flag_property_fetch_on_expensive_base(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if ($this->getExtension() === "php" && (tryIt(fn() => true)->data ?? false)) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(0, $violations);
+
+        unlink($file);
+    }
+
     public function test_skips_non_php_files(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'catraca_test_').'.txt';

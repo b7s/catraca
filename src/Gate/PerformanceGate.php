@@ -32,6 +32,7 @@ readonly class PerformanceGate implements GateInterface
         $violations = 0;
         $files = [];
         $messages = [];
+        $reasons = [];
         $hasTool = false;
 
         $enabledRules = $this->getEnabledRules($baseline);
@@ -71,6 +72,7 @@ readonly class PerformanceGate implements GateInterface
             $hasTool = true;
             $violations += $conditionResult['violations'];
             $files = array_merge($files, $conditionResult['files']);
+            $reasons = array_merge($reasons, $conditionResult['reasons']);
             if ($conditionResult['violations'] > 0) {
                 $messages[] = $conditionResult['message'];
             }
@@ -87,7 +89,7 @@ readonly class PerformanceGate implements GateInterface
         }
 
         $baselineViolations = $baseline->get('performance', 'violations', 0);
-        [$status, $actions] = $this->evaluateViolations($violations, $files, $messages);
+        [$status, $actions] = $this->evaluateViolations($violations, $files, $messages, $reasons);
 
         $message = $violations > 0
             ? sprintf('%d improvement(s) found (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0)
@@ -257,7 +259,7 @@ readonly class PerformanceGate implements GateInterface
 
     /**
      * @param  array<int, string>  $paths
-     * @return array{violations: int, files: array<int, string>, message: string}
+     * @return array{violations: int, files: array<int, string>, reasons: array<int, string>, message: string}
      */
     private function checkConditionOrder(array $paths): array
     {
@@ -268,23 +270,33 @@ readonly class PerformanceGate implements GateInterface
             return [
                 'violations' => 0,
                 'files' => [],
+                'reasons' => [],
                 'message' => '',
             ];
         }
 
         $files = [];
+        $reasons = [];
         foreach ($violations as $v) {
             $files[] = $v['file'].':'.$v['line'];
+            $reasons[] = $v['message'];
         }
 
         return [
             'violations' => count($violations),
             'files' => $files,
+            'reasons' => $reasons,
             'message' => sprintf('%d condition order issues — cheaper conditions should come first', count($violations)),
         ];
     }
 
-    private function evaluateViolations(int $violations, array $files, array $messages): array
+    /**
+     * @param  array<int, string>  $files
+     * @param  array<int, string>  $messages
+     * @param  array<int, string>  $reasons
+     * @return array{0: Status, 1: array<array{type: ActionType, message: string, files: array<int, string>, reasons: array<int, string>}>|null}
+     */
+    private function evaluateViolations(int $violations, array $files, array $messages, array $reasons = []): array
     {
         $status = Status::Pass;
         $actions = null;
@@ -295,6 +307,7 @@ readonly class PerformanceGate implements GateInterface
                 'type' => ActionType::ImprovePerformance,
                 'message' => implode('; ', $messages),
                 'files' => array_slice($files, 0, 50),
+                'reasons' => array_slice($reasons, 0, 50),
             ]];
         }
 

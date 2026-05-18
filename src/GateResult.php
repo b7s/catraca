@@ -9,7 +9,7 @@ use B7S\Catraca\Enum\Status;
 readonly class GateResult
 {
     /**
-     * @param  array<array{type: ActionType, message: string, files?: array<int, string>}>|null  $actions
+     * @param  array<array{type: ActionType, message: string, files?: array<int, string>, reasons?: array<int, string>}>|null  $actions
      */
     public function __construct(
         public Status $status,
@@ -57,6 +57,7 @@ readonly class GateResult
                 'type' => $a['type']->value,
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],
+                'reasons' => $a['reasons'] ?? [],
             ], $this->actions);
         }
         if ($this->details !== null) {
