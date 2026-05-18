@@ -193,6 +193,64 @@ final class ConditionOrderAnalyzerTest extends TestCase
         unlink($file);
     }
 
+    public function test_detects_method_exists_before_isset(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (method_exists($obj, "foo") && isset($x)) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('left side costs 3', $violations[0]['message']);
+        self::assertStringContainsString('right side costs 0', $violations[0]['message']);
+
+        unlink($file);
+    }
+
+    public function test_detects_method_exists_before_empty(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (method_exists($obj, "foo") && empty($x)) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('left side costs 3', $violations[0]['message']);
+        self::assertStringContainsString('right side costs 0', $violations[0]['message']);
+
+        unlink($file);
+    }
+
+    public function test_does_not_flag_isset_before_method_exists(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (isset($x) && method_exists($obj, "foo")) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(0, $violations);
+
+        unlink($file);
+    }
+
     public function test_detects_function_call_before_empty(): void
     {
         $file = $this->createTempFile('

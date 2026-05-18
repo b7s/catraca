@@ -27,19 +27,39 @@ use function sprintf;
 
 readonly class ConditionOrderAnalyzer
 {
-    private const array GUARD_FUNCTIONS = [
-        'isset', 'empty', 'is_array', 'is_bool', 'is_callable', 'is_countable',
-        'is_double', 'is_float', 'is_int', 'is_integer', 'is_iterable',
-        'is_long', 'is_null', 'is_numeric', 'is_object', 'is_real',
-        'is_resource', 'is_scalar', 'is_string', 'array_key_exists',
-        'key_exists', 'defined', 'class_exists', 'interface_exists',
-        'trait_exists', 'function_exists', 'method_exists', 'property_exists',
-    ];
+    private const array FUNCTION_COSTS = [
+        'isset' => 0,
+        'empty' => 0,
+        'is_array' => 0,
+        'is_bool' => 0,
+        'is_callable' => 0,
+        'is_countable' => 0,
+        'is_double' => 0,
+        'is_float' => 0,
+        'is_int' => 0,
+        'is_integer' => 0,
+        'is_iterable' => 0,
+        'is_long' => 0,
+        'is_null' => 0,
+        'is_numeric' => 0,
+        'is_object' => 0,
+        'is_real' => 0,
+        'is_resource' => 0,
+        'is_scalar' => 0,
+        'is_string' => 0,
+        'array_key_exists' => 0,
+        'key_exists' => 0,
 
-    private const array CHEAP_FUNCTIONS = [
-        'count', 'strlen', 'mb_strlen', 'sizeof',
-        'str_contains', 'str_starts_with', 'str_ends_with',
-        'ctype_digit', 'ctype_alpha', 'ctype_alnum',
+        'count' => 1,
+        'strlen' => 1,
+        'mb_strlen' => 1,
+        'sizeof' => 1,
+        'str_contains' => 1,
+        'str_starts_with' => 1,
+        'str_ends_with' => 1,
+        'ctype_digit' => 1,
+        'ctype_alpha' => 1,
+        'ctype_alnum' => 1,
     ];
 
     public const array SIDE_EFFECT_FUNCTIONS = [
@@ -207,14 +227,7 @@ readonly class ConditionOrderAnalyzer
     {
         $name = $this->resolveFunctionName($node);
 
-        $baseCost = 3;
-        if ($name !== null) {
-            if (in_array($name, self::GUARD_FUNCTIONS, true)) {
-                $baseCost = 0;
-            } elseif (in_array($name, self::CHEAP_FUNCTIONS, true)) {
-                $baseCost = 1;
-            }
-        }
+        $baseCost = $name !== null ? (self::FUNCTION_COSTS[$name] ?? 3) : 3;
 
         $argCosts = [];
         foreach ($node->args as $arg) {
