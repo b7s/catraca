@@ -162,7 +162,7 @@ readonly class ConditionOrderAnalyzer
                 $this->computeCost($node->var),
                 $node->dim !== null ? $this->computeCost($node->dim) : 0,
             ),
-            $node instanceof Expr\Array_ => 1,
+            $node instanceof Expr\Array_ => $this->arrayCost($node),
 
             $node instanceof Expr\BinaryOp\Greater,
             $node instanceof Expr\BinaryOp\GreaterOrEqual,
@@ -233,6 +233,23 @@ readonly class ConditionOrderAnalyzer
         }
 
         return max($baseCost, max($argCosts));
+    }
+
+    private function arrayCost(Expr\Array_ $node): int
+    {
+        $costs = [];
+        foreach ($node->items as $item) {
+            $costs[] = $this->computeCost($item->value);
+            if ($item->key !== null) {
+                $costs[] = $this->computeCost($item->key);
+            }
+        }
+
+        if ($costs === []) {
+            return 0;
+        }
+
+        return max($costs);
     }
 
     public function resolveFunctionName(Expr\FuncCall $node): ?string
