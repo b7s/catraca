@@ -250,6 +250,42 @@ final class ConditionOrderAnalyzerTest extends TestCase
         unlink($file2);
     }
 
+    public function test_does_not_flag_empty_with_expensive_inner_expression(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (isset($x) && is_string($x) && ! empty(mb_trim($x))) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(0, $violations);
+
+        unlink($file);
+    }
+
+    public function test_does_not_flag_same_cost_with_empty_wrapping_expensive(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if ($this->expensive() && empty(mb_trim($x))) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(0, $violations);
+
+        unlink($file);
+    }
+
     public function test_skips_non_php_files(): void
     {
         $file = tempnam(sys_get_temp_dir(), 'catraca_test_').'.txt';

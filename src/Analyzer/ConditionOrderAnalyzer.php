@@ -151,8 +151,8 @@ readonly class ConditionOrderAnalyzer
             $node instanceof Expr\ConstFetch,
             $node instanceof Expr\ClassConstFetch,
             $node instanceof Expr\Instanceof_,
-            $node instanceof Expr\Isset_,
-            $node instanceof Expr\Empty_ => 0,
+            $node instanceof Expr\Isset_ => 0,
+            $node instanceof Expr\Empty_ => $this->computeCost($node->expr),
 
             $node instanceof Expr\PropertyFetch,
             $node instanceof Expr\ArrayDimFetch,
