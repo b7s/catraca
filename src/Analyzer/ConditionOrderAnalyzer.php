@@ -175,7 +175,8 @@ readonly class ConditionOrderAnalyzer
             $node instanceof Expr\BinaryOp\NotIdentical,
             $node instanceof Expr\BinaryOp\Concat,
             $node instanceof BooleanAnd,
-            $node instanceof BooleanOr => max(
+            $node instanceof BooleanOr,
+            $node instanceof Expr\BinaryOp => max(
                 $this->computeCost($node->left),
                 $this->computeCost($node->right),
             ),
@@ -198,11 +199,6 @@ readonly class ConditionOrderAnalyzer
             ),
 
             $node instanceof Expr\ErrorSuppress => $this->computeCost($node->expr),
-
-            $node instanceof Expr\BinaryOp => max(
-                $this->computeCost($node->left),
-                $this->computeCost($node->right),
-            ),
 
             default => 2,
         };
