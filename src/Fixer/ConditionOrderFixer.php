@@ -8,7 +8,6 @@ use B7S\Catraca\Analyzer\ConditionOrderAnalyzer;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
-use PhpParser\Lexer\Emulative;
 use PhpParser\Node;
 use PhpParser\Node\Expr\BinaryOp\BooleanAnd;
 use PhpParser\Node\Expr\BinaryOp\BooleanOr;
@@ -16,7 +15,6 @@ use PhpParser\NodeFinder;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\CloningVisitor;
 use PhpParser\ParserFactory;
-use PhpParser\PhpVersion;
 use PhpParser\PrettyPrinter\Standard;
 use Throwable;
 
@@ -92,7 +90,6 @@ readonly class ConditionOrderFixer implements FixerInterface
         }
 
         $fixedCount = 0;
-        $lexer = new Emulative(PhpVersion::getHostVersion());
         $parser = (new ParserFactory)->createForHostVersion();
         $nodeFinder = new NodeFinder;
         $printer = new Standard;

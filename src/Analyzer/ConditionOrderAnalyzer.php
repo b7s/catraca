@@ -37,10 +37,9 @@ readonly class ConditionOrderAnalyzer
     ];
 
     private const array CHEAP_FUNCTIONS = [
-        'count', 'strlen', 'mb_strlen', 'sizeof', 'in_array', 'array_search',
-        'str_contains', 'str_starts_with', 'str_ends_with', 'preg_match',
-        'preg_match_all', 'file_exists', 'is_file', 'is_dir', 'is_readable',
-        'is_writable', 'is_link', 'ctype_digit', 'ctype_alpha', 'ctype_alnum',
+        'count', 'strlen', 'mb_strlen', 'sizeof',
+        'str_contains', 'str_starts_with', 'str_ends_with',
+        'ctype_digit', 'ctype_alpha', 'ctype_alnum',
     ];
 
     public const array SIDE_EFFECT_FUNCTIONS = [

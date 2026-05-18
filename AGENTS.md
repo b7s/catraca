@@ -878,6 +878,58 @@ json_encode($data, JSON_UNESCAPED_SLASHES);
 json_encode($data, JSON_PRETTY_PRINT);
 ```
 
+### Boolean Condition Ordering for performance
+In `&&` and `||` expressions, cheaper conditions should come first so PHP can short-circuit and skip expensive evaluations.
+
+**Cost model:**
+
+| Cost | Expression types | Examples |
+|------|-----------------|----------|
+| **0** | Variables, literals, guards | `$x`, `true`, `isset($x)`, `empty($y)`, `is_array($z)`, `is_numeric($n)`, `instanceof Foo` |
+| **1** | Property/array access, comparisons, cheap functions | `$obj->prop`, `$arr['key']`, `$a === $b`, `$x > 0`, `count($arr)`, `strlen($s)`, `str_contains($h, $n)` |
+| **2** | Default (casts, closures, non-guard func calls) | `(int) $x`, `fn() => true`, `someHelper()` |
+| **3** | Method calls, static calls, `new`, assignments | `$this->method()`, `Foo::bar()`, `new Entity()`, `$x = expensive()` |
+
+**Rules:**
+
+1. **Guards always come first** — `isset`, `empty`, and `is_*` checks should be the leftmost conditions. They are the cheapest and prevent errors in subsequent checks.
+   ```php
+   // Good — guard first
+   if (isset($array['key']) && is_array($array['key'])) {}
+   
+   // Bad — expensive check before guard
+   if (is_array($array['key']) && isset($array['key'])) {}
+   ```
+
+2. **Property and array access come after guards** — Accessing properties or array elements costs 1, but only if the base expression is cheap. `$this->foo` costs 1, but `tryIt()->data` costs 3 because of the method call.
+   ```php
+   // Good — cheap property access after guard
+   if (isset($record->data) && $record->data !== []) {}
+   
+   // Bad — method call before guard
+   if ($record->getData() !== [] && isset($record->data)) {}
+   ```
+
+3. **Empty array literals `[]` cost 0** — They are literals, just like `true` or `null`.
+   ```php
+   // Good — literal comparison is cheap
+   if ($options !== [] && isset($first['label']) && is_array($first)) {}
+   ```
+
+4. **Never reorder expressions with side effects** — Functions like `mkdir`, `unlink`, `file_put_contents`, etc. must stay in their original position because their execution order matters.
+
+5. **Nested `&&` chains are evaluated left-to-right** — Each adjacent pair is checked independently. Fix iteratively.
+   ```php
+   // Original: all three conditions are in suboptimal order
+   if ($expensive() && $cheap && isset($x)) {}
+   
+   // After first fix:
+   if ($cheap && $expensive() && isset($x)) {}
+   
+   // After second fix:
+   if ($cheap && isset($x) && $expensive()) {}
+   ```
+   
 ---
 
 ## Error Handling

@@ -286,6 +286,64 @@ final class ConditionOrderAnalyzerTest extends TestCase
         unlink($file);
     }
 
+    public function test_detects_in_array_before_empty(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (! in_array($lang, [null, "", "0"], true) && ! empty($recordData[$lang])) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('left side costs 3', $violations[0]['message']);
+        self::assertStringContainsString('right side costs 1', $violations[0]['message']);
+
+        unlink($file);
+    }
+
+    public function test_detects_in_array_before_isset(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (! in_array($lang, [null, "", "0"], true) && ! isset($recordData[$lang])) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(1, $violations);
+        self::assertStringContainsString('left side costs 3', $violations[0]['message']);
+        self::assertStringContainsString('right side costs 0', $violations[0]['message']);
+
+        unlink($file);
+    }
+
+    public function test_does_not_flag_empty_before_in_array(): void
+    {
+        $file = $this->createTempFile('
+            <?php
+            class Test {
+                public function run() {
+                    if (! empty($recordData[$lang]) && ! in_array($lang, [null, "", "0"], true)) {}
+                }
+            }
+        ');
+
+        $violations = $this->analyzer->analyze([$file]);
+
+        self::assertCount(0, $violations);
+
+        unlink($file);
+    }
+
     public function test_does_not_flag_property_fetch_on_expensive_base(): void
     {
         $file = $this->createTempFile('

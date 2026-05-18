@@ -78,7 +78,7 @@ readonly class StyleGate implements GateInterface
 
         if ($violations === 0 && $exitCode !== 0) {
             $lines = array_filter(explode("\n", $output));
-            $dirtyFiles = array_filter($lines, static fn (string $l): bool => preg_match('/\.(php|blade\.php)$/', $l) && ! str_contains($l, ' '));
+            $dirtyFiles = array_filter($lines, static fn (string $l): bool => ! str_contains($l, ' ') && preg_match('/\.(php|blade\.php)$/', $l));
             if (count($dirtyFiles) > 0) {
                 $violations = count($dirtyFiles);
                 $files = array_values(array_map(static fn (string $f): string => trim($f), $dirtyFiles));
