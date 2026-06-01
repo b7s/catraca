@@ -12,28 +12,21 @@ use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
 use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
+use Parallite\ForkExecutor;
+use Parallite\ParalliteClient;
+use RuntimeException;
 
+use Throwable;
 use function array_filter;
 use function array_keys;
 use function array_map;
 use function array_merge;
 use function array_slice;
 use function count;
-use function file_get_contents;
-use function file_put_contents;
-use function function_exists;
 use function implode;
 use function is_array;
 use function is_int;
-use function json_decode;
-use function json_encode;
-use function pcntl_fork;
-use function pcntl_waitpid;
-use function posix_getpid;
 use function sprintf;
-use function sys_get_temp_dir;
-use function tempnam;
-use function unlink;
 
 readonly class SecurityGate implements GateInterface
 {
@@ -75,6 +68,9 @@ readonly class SecurityGate implements GateInterface
         private SourcePathResolver $pathResolver = new SourcePathResolver,
     ) {}
 
+    /**
+     * @throws Throwable
+     */
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $rules = $this->getEnabledRules($baseline);
@@ -82,7 +78,7 @@ readonly class SecurityGate implements GateInterface
         $sourceDirs = $baseline->getSourceDirs();
         $paths = $this->pathResolver->resolve($root, $sourceDirs);
         $releasedDays = $this->getReleasedDays($baseline);
-        $parallel = $baseline->isParallelEnabled() && $this->pcntlAvailable();
+        $parallel = $baseline->isParallelEnabled() && ForkExecutor::isAvailable();
 
         $findingsByRule = $parallel
             ? $this->runSubChecksParallel($root, $paths, $rules, $releasedDays, $resolver)
@@ -156,11 +152,12 @@ readonly class SecurityGate implements GateInterface
 
     /**
      * @return array<string, array<int, string>>
+     * @throws Throwable
      */
     private function runSubChecksParallel(string $root, array $paths, array $rules, int $releasedDays, ToolResolver $resolver): array
     {
-        $tempFiles = [];
-        $pids = [];
+        $client = new ParalliteClient;
+        $closures = [];
         $ruleOrder = [];
 
         foreach (self::SUB_CHECK_METHODS as $rule => $method) {
@@ -171,52 +168,16 @@ readonly class SecurityGate implements GateInterface
             $ruleOrder[] = $rule;
             $isPackageFreshness = $rule === 'package_freshness';
             $args = $isPackageFreshness ? [$releasedDays] : [];
-            $tempFiles[$rule] = tempnam(sys_get_temp_dir(), 'catraca_sec_'.posix_getpid().'_');
 
-            $pid = pcntl_fork();
-
-            if ($pid === -1) {
-                $tempFiles[$rule] = null;
-
-                continue;
-            }
-
-            if ($pid === 0) {
-                $sub = new SecuritySubCheck($root, $paths);
-                $result = $sub->{$method}(...$args);
-                file_put_contents($tempFiles[$rule], json_encode($result, JSON_UNESCAPED_SLASHES));
-                exit(0);
-            }
-
-            $pids[$rule] = $pid;
+            $closures[] = static fn () => (new SecuritySubCheck($root, $paths))->{$method}(...$args);
         }
 
-        foreach ($pids as $pid) {
-            pcntl_waitpid($pid, $status);
-        }
+        $rawResults = $client->awaitAll($closures);
 
         $findingsByRule = [];
-
-        foreach ($ruleOrder as $rule) {
-            $tempPath = $tempFiles[$rule] ?? null;
-
-            if ($tempPath === null || ! file_exists($tempPath)) {
-                $findingsByRule[$rule] = [];
-
-                continue;
-            }
-
-            $raw = file_get_contents($tempPath);
-            @unlink($tempPath);
-
-            if ($raw === false || $raw === '') {
-                $findingsByRule[$rule] = [];
-
-                continue;
-            }
-
-            $data = json_decode($raw, true);
-            $findingsByRule[$rule] = is_array($data) ? $data : [];
+        foreach ($ruleOrder as $i => $rule) {
+            $data = $rawResults[$i] ?? null;
+            $findingsByRule[$rule] = (! is_array($data)) ? [] : $data;
         }
 
         foreach (array_keys(self::SUB_CHECK_METHODS) as $rule) {
@@ -249,12 +210,5 @@ readonly class SecurityGate implements GateInterface
         }
 
         return 3;
-    }
-
-    private function pcntlAvailable(): bool
-    {
-        return function_exists('pcntl_fork')
-            && function_exists('pcntl_waitpid')
-            && function_exists('posix_getpid');
     }
 }

@@ -14,7 +14,7 @@
             "tls_verification": true,
             "insecure_rng": true,
             "gitignore_sensitive": true,
-            "package_freshness": true,
+            "package_freshness": false,
             "weak_cryptography": true,
             "cors_config": true,
             "npm_audit": true
@@ -70,7 +70,7 @@
         }
     },
     "schema": "catraca/v1",
-    "updated_at": "2026-06-01T13:10:02+00:00",
+    "updated_at": "2026-06-01T18:04:29+00:00",
     "source_dirs": {
         "paths": [
             "src",
