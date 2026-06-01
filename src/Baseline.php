@@ -2,6 +2,7 @@
 
 namespace B7S\Catraca;
 
+use B7S\Catraca\Gate\SecurityGate;
 use DateTimeImmutable;
 use DateTimeInterface;
 
@@ -76,7 +77,11 @@ class Baseline
             'schema' => self::SCHEMA,
             'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ISO8601_EXPANDED),
             'source_dirs' => ['paths' => self::DEFAULT_SOURCE_DIRS],
-            'security' => ['advisories' => null],
+            'security' => [
+                'advisories' => null,
+                'rules' => SecurityGate::DEFAULT_RULES,
+                'fixers' => [],
+            ],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
             'coverage' => ['percentage' => 85.0],

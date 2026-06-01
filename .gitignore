@@ -1,7 +1,6 @@
 /vendor/
 /composer.lock
 .phpunit.result.cache
-catraca_baseline.json
 *.cache
 .idea/
 /.php-cs-fixer.dist.php

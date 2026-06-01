@@ -44,7 +44,7 @@ composer require --dev systemsdk/phpcpd:^9.0
 composer require --dev phpmetrics/phpmetrics
 ```
 
-Any tool not installed is **skipped** (not failed). Security audit uses `composer audit` (built-in).
+Any tool not installed is **skipped** (not failed). Security audit uses `composer audit` (built-in) and 14 source-code checks.
 
 ## Usage
 
@@ -61,6 +61,7 @@ Default baseline:
 | Setting | Default |
 |---------|---------|
 | Source Dirs | `["src", "app", "lib"]` |
+| Security | 0 advisories, 14 checks all enabled |
 | Code Style | 0 violations |
 | Static Analysis | 0 errors (level 5 if no `phpstan.neon`) |
 | Test Coverage | 85% minimum |
@@ -78,9 +79,26 @@ You can edit `catraca_baseline.json` directly to adjust thresholds.
     "source_dirs": {
         "paths": ["src", "app", "lib"]
     },
-    "security": {
-        "advisories": 0
+  "security": {
+    "advisories": 0,
+    "rules": {
+      "hardcoded_secrets": true,
+      "sql_injection": true,
+      "command_injection": true,
+      "csrf_protection": true,
+      "path_traversal": true,
+      "insecure_deserialization": true,
+      "ssrf": true,
+      "tls_verification": true,
+      "insecure_rng": true,
+      "gitignore_sensitive": true,
+      "package_freshness": true,
+      "weak_cryptography": true,
+      "cors_config": true,
+      "npm_audit": true
     },
+    "fixers": []
+  },
     "style": {
         "violations": 0
     },
@@ -269,7 +287,7 @@ Gates run in order. A failure blocks the PR.
 
 | # | Gate | Tool | Default Threshold |
 |---|------|------|-------------------|
-| 1 | Security Audit | `composer audit` | 0 critical/high advisories |
+| 1 | Security Audit | `composer audit` + 14 built-in checks | 0 critical/high advisories, 0 findings |
 | 2 | Code Style | `pint` or `php-cs-fixer` | 0 violations |
 | 3 | Static Analysis | `phpstan` or `psalm` | 0 errors (level 5 if no config) |
 | 4 | Test Coverage | `phpunit` or `pest` | 85% minimum |
@@ -277,6 +295,53 @@ Gates run in order. A failure blocks the PR.
 | 6 | File Size | Built-in | 1000 lines per file |
 | 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
 | 8 | Performance | `php-cs-fixer` | 0 violations |
+
+The Security gate runs `composer audit` (always) plus 14 source-code checks (all enabled by default):
+
+| Rule | What it detects |
+  |------|-----------------|
+| `hardcoded_secrets` | API keys, tokens, private keys, and other credentials in source code |
+| `sql_injection` | Raw SQL with interpolated variables (`DB::select("...$var")`, `whereRaw`) |
+| `command_injection` | `exec`/`shell_exec`/`system`/`passthru` with unsanitized variables |
+| `csrf_protection` | Missing `@csrf` in Laravel forms with POST/PUT/DELETE methods |
+| `path_traversal` | `file_get_contents`, `Storage::`, `include` with user-controlled paths |
+| `insecure_deserialization` | `unserialize()` with dynamic input or `base64_decode` chains |
+| `ssrf` | `Http::`, Guzzle, `curl_setopt(CURLOPT_URL)` with user-controlled URLs |
+| `tls_verification` | `withoutVerifying()`, `'verify' => false`, disabled `CURLOPT_SSL_VERIFYPEER` |
+| `insecure_rng` | `rand()`/`mt_rand()`/`uniqid()` used for tokens/secrets (should use `random_bytes`) |
+| `gitignore_sensitive` | Missing `.env`, `*.key`, `*.pem` entries in `.gitignore` |
+| `package_freshness` | Composer packages released less than 3 days ago (untested) |
+| `weak_cryptography` | `mcrypt_*`, ECB mode, DES/3DES/RC4, `md5`/`sha1` in security contexts |
+| `cors_config` | `Access-Control-Allow-Origin: *` with credentials in Laravel CORS config |
+| `npm_audit` | Known vulnerabilities in npm packages (if `package-lock.json` exists) |
+
+All rules are configurable in `catraca_baseline.json` under `security.rules`. Set any rule to `false` to disable it:
+
+```json
+{
+  "security": {
+    "advisories": 0,
+    "rules": {
+      "hardcoded_secrets": true,
+      "sql_injection": true,
+      "command_injection": true,
+      "csrf_protection": false,
+      "path_traversal": true,
+      "insecure_deserialization": true,
+      "ssrf": true,
+      "tls_verification": true,
+      "insecure_rng": true,
+      "gitignore_sensitive": true,
+      "package_freshness": true,
+      "weak_cryptography": true,
+      "cors_config": true,
+      "npm_audit": false
+    }
+  }
+}
+```
+
+CSRF and CORS checks only apply to Laravel projects — they are **skipped** (not failed) when no Laravel directory structure is detected.
 
 The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by default):
 
