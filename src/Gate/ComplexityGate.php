@@ -83,12 +83,18 @@ class ComplexityGate implements GateInterface
             $classes = $data['classes'] ?? [];
             if (is_array($classes)) {
                 /** @var array<string, mixed> $classes */
-                $this->extractFromClasses($classes, $violations, $warnings, $maxCcn);
+                $this->extractMethods($classes, $violations, $warnings, $maxCcn, static fn (mixed $key, mixed $data): array => [
+                    is_string($key) ? $key : 'unknown',
+                    $data,
+                ]);
             }
             $files = $data['files'] ?? [];
             if (is_array($files)) {
                 /** @var array<string, mixed> $files */
-                $this->extractFromFiles($files, $violations, $warnings, $maxCcn);
+                $this->extractMethods($files, $violations, $warnings, $maxCcn, static fn (mixed $key, mixed $data): array => [
+                    is_array($data) && is_string($data['name'] ?? null) ? $data['name'] : 'unknown',
+                    is_array($data) ? $data : [],
+                ]);
             }
         }
 
@@ -146,44 +152,24 @@ class ComplexityGate implements GateInterface
     }
 
     /**
-     * @param  array<string, mixed>  $classes
+     * @param  array<string, mixed>  $items
      * @param  array<int, array{file: string, method: string, ccn: int}>  $violations
      * @param  array<int, array{file: string, method: string, ccn: int}>  $warnings
+     * @param  callable(mixed $key, mixed $methodData): array{string, mixed}  $extractNameAndData
      */
-    private function extractFromClasses(array $classes, array &$violations, array &$warnings, int &$maxCcn): void
+    private function extractMethods(array $items, array &$violations, array &$warnings, int &$maxCcn, callable $extractNameAndData): void
     {
-        foreach ($classes as $fqcn => $classData) {
-            if (! is_array($classData)) {
+        foreach ($items as $key => $itemData) {
+            if (! is_array($itemData)) {
                 continue;
             }
-            $methods = $classData['methods'] ?? [];
+            $methods = $itemData['methods'] ?? [];
             if (! is_array($methods)) {
                 continue;
             }
-            foreach ($methods as $methodName => $methodData) {
-                $this->processMethod($fqcn, is_string($methodName) ? $methodName : 'unknown', $methodData, $violations, $warnings, $maxCcn);
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $files
-     * @param  array<int, array{file: string, method: string, ccn: int}>  $violations
-     * @param  array<int, array{file: string, method: string, ccn: int}>  $warnings
-     */
-    private function extractFromFiles(array $files, array &$violations, array &$warnings, int &$maxCcn): void
-    {
-        foreach ($files as $filePath => $fileData) {
-            if (! is_array($fileData)) {
-                continue;
-            }
-            $methods = $fileData['methods'] ?? [];
-            if (! is_array($methods)) {
-                continue;
-            }
-            foreach ($methods as $method) {
-                $name = is_array($method) && is_string($method['name'] ?? null) ? $method['name'] : 'unknown';
-                $this->processMethod($filePath, $name, is_array($method) ? $method : [], $violations, $warnings, $maxCcn);
+            foreach ($methods as $methodKey => $methodData) {
+                [$name, $data] = $extractNameAndData($methodKey, $methodData);
+                $this->processMethod($key, $name, $data, $violations, $warnings, $maxCcn);
             }
         }
     }

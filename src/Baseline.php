@@ -6,7 +6,9 @@ use B7S\Catraca\Gate\SecurityGate;
 use DateTimeImmutable;
 use DateTimeInterface;
 
+use function array_key_exists;
 use function is_array;
+use function is_bool;
 use function is_string;
 
 class Baseline
@@ -73,14 +75,32 @@ class Baseline
 
     public function init(): void
     {
-        $this->write([
+        $defaults = $this->defaults();
+        $existing = $this->read();
+
+        if ($existing === null) {
+            $defaults['created_at'] = (new DateTimeImmutable)->format(DateTimeInterface::ISO8601_EXPANDED);
+            $this->write($defaults);
+
+            return;
+        }
+
+        $this->write($this->mergeDefaults($existing, $defaults));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function defaults(): array
+    {
+        return [
             'schema' => self::SCHEMA,
-            'created_at' => (new DateTimeImmutable)->format(DateTimeInterface::ISO8601_EXPANDED),
             'source_dirs' => ['paths' => self::DEFAULT_SOURCE_DIRS],
             'security' => [
                 'advisories' => null,
                 'rules' => SecurityGate::DEFAULT_RULES,
                 'fixers' => [],
+                'released_days' => 3,
             ],
             'style' => ['violations' => 0],
             'static_analysis' => ['errors' => 0],
@@ -111,7 +131,33 @@ class Baseline
             ],
             'file_size' => ['max_lines' => 1000],
             'complexity' => ['max_ccn' => 0],
-        ]);
+            'parallel' => ['enabled' => true],
+        ];
+    }
+
+    /**
+     * Recursively merge defaults into existing data, only adding missing keys.
+     * Existing values are never overwritten.
+     *
+     * @param  array<string, mixed>  $existing
+     * @param  array<string, mixed>  $defaults
+     * @return array<string, mixed>
+     */
+    private function mergeDefaults(array $existing, array $defaults): array
+    {
+        foreach ($defaults as $key => $default) {
+            if (! array_key_exists($key, $existing)) {
+                $existing[$key] = $default;
+
+                continue;
+            }
+
+            if (is_array($default) && is_array($existing[$key])) {
+                $existing[$key] = $this->mergeDefaults($existing[$key], $default);
+            }
+        }
+
+        return $existing;
     }
 
     /**
@@ -125,6 +171,13 @@ class Baseline
         }
 
         return self::DEFAULT_SOURCE_DIRS;
+    }
+
+    public function isParallelEnabled(): bool
+    {
+        $enabled = $this->get('parallel', 'enabled', null);
+
+        return is_bool($enabled) ? $enabled : true;
     }
 
     public function get(string $gate, string $key, mixed $default = null): mixed

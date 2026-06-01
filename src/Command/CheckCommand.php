@@ -4,12 +4,6 @@ namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Baseline;
 use B7S\Catraca\Catraca;
-use B7S\Catraca\Fixer\AutoloadFixer;
-use B7S\Catraca\Fixer\CodeStyleFixer;
-use B7S\Catraca\Fixer\ConditionOrderFixer;
-use B7S\Catraca\Fixer\FixerInterface;
-use B7S\Catraca\Fixer\PerformanceFixer;
-use B7S\Catraca\FixResult;
 use B7S\Catraca\ToolResolver;
 use JsonException;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -25,20 +19,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 class CheckCommand extends Command
 {
     use CommandHelper;
-
-    /** @var array<int, FixerInterface> */
-    private array $fixers;
-
-    public function __construct()
-    {
-        parent::__construct();
-        $this->fixers = [
-            new ConditionOrderFixer,
-            new PerformanceFixer,
-            new CodeStyleFixer,
-            new AutoloadFixer,
-        ];
-    }
 
     protected function configure(): void
     {
@@ -69,11 +49,7 @@ class CheckCommand extends Command
 
         $baseline = new Baseline($projectRoot);
         $resolver = new ToolResolver($projectRoot);
-        $fixResult = new FixResult;
-
-        foreach ($this->fixers as $fixer) {
-            $fixResult->add($fixer->fix($baseline, $resolver));
-        }
+        $fixResult = $this->runFixers($baseline, $resolver);
 
         $this->formatFixResult($input, $output, $fixResult);
 

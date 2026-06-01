@@ -21,7 +21,7 @@ jobs:
         with:
           php-version: "8.3"
           coverage: pcov
-          tools: composer, phpstan, pint, phpmetrics
+          tools: composer, phpstan/phpstan, laravel/pint, phpmetrics/phpmetrics
 
       - name: Cache Composer packages
         uses: actions/cache@v3

@@ -6,6 +6,8 @@ use B7S\Catraca\Enum\ActionType;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 
+use function is_array;
+
 readonly class GateResult
 {
     /**
@@ -31,6 +33,31 @@ readonly class GateResult
     public function isFail(): bool
     {
         return $this->status === Status::Fail;
+    }
+
+    public static function fromArray(array $data): self
+    {
+        $actions = null;
+        if (isset($data['actions']) && is_array($data['actions'])) {
+            $actions = array_map(static fn (array $a): array => [
+                'type' => ActionType::from($a['type']),
+                'message' => $a['message'],
+                'files' => $a['files'] ?? [],
+                'reasons' => $a['reasons'] ?? [],
+            ], $data['actions']);
+        }
+
+        return new self(
+            status: Status::from($data['status']),
+            name: $data['name'],
+            label: $data['label'],
+            message: $data['message'],
+            severity: Severity::from($data['severity']),
+            baseline: $data['baseline'] ?? null,
+            current: $data['current'] ?? null,
+            actions: $actions,
+            details: $data['details'] ?? null,
+        );
     }
 
     /**

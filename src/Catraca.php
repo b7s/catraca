@@ -2,7 +2,6 @@
 
 namespace B7S\Catraca;
 
-use B7S\Catraca\Enum\Status;
 use B7S\Catraca\Gate\ComplexityGate;
 use B7S\Catraca\Gate\CoverageGate;
 use B7S\Catraca\Gate\DuplicationGate;
@@ -11,25 +10,21 @@ use B7S\Catraca\Gate\PerformanceGate;
 use B7S\Catraca\Gate\SecurityGate;
 use B7S\Catraca\Gate\StaticAnalysisGate;
 use B7S\Catraca\Gate\StyleGate;
-use Throwable;
 
-use function get_class;
+use function is_array;
 
 class Catraca
 {
     private Baseline $baseline;
 
-    private ToolResolver $resolver;
-
-    /** @var array<int, array{gate: GateInterface, name: string}> */
-    private array $gates = [];
+    private GateRunner $gateRunner;
 
     public function __construct(string $projectRoot)
     {
         $this->baseline = new Baseline($projectRoot);
-        $this->resolver = new ToolResolver($projectRoot);
+        $resolver = new ToolResolver($projectRoot);
 
-        $this->gates = [
+        $gates = [
             ['gate' => new SecurityGate, 'name' => 'Security Audit'],
             ['gate' => new StyleGate, 'name' => 'Code Style'],
             ['gate' => new StaticAnalysisGate, 'name' => 'Static Analysis'],
@@ -39,17 +34,17 @@ class Catraca
             ['gate' => new ComplexityGate, 'name' => 'Cyclomatic Complexity'],
             ['gate' => new PerformanceGate, 'name' => 'Performance'],
         ];
+
+        $this->gateRunner = new GateRunner($this->baseline, $resolver, $gates);
     }
 
     public function init(): CheckResult
     {
         $result = new CheckResult;
 
-        if (! $this->baseline->exists()) {
-            $this->baseline->init();
-        }
+        $this->baseline->init();
 
-        $this->getDef($result);
+        $this->runGates($result);
 
         $this->writeBaseline($result);
 
@@ -58,43 +53,38 @@ class Catraca
 
     public function check(): CheckResult
     {
-        if (! $this->baseline->exists()) {
-            $this->baseline->init();
-        }
+        $this->baseline->init();
 
         $result = new CheckResult;
 
-        $this->getDef($result);
+        $this->runGates($result);
 
         return $result;
     }
 
     private function writeBaseline(CheckResult $result): void
     {
-        $data = [];
+        $existing = $this->baseline->read() ?? [];
+        $data = $existing;
+
         foreach ($result->getGates() as $gate) {
             if ($gate->current !== null) {
-                $data[$gate->name] = $gate->current;
+                $data[$gate->name] = array_merge(
+                    is_array($existing[$gate->name] ?? null) ? $existing[$gate->name] : [],
+                    $gate->current,
+                );
             }
         }
+
         $this->baseline->write($data);
     }
 
-    private function getDef(CheckResult $result): void
+    private function runGates(CheckResult $result): void
     {
-        foreach ($this->gates as $gateDef) {
-            try {
-                $gateResult = $gateDef['gate']->run($this->baseline, $this->resolver);
-                $result->add($gateResult);
-            } catch (Throwable $e) {
-                $result->add(new GateResult(
-                    status: Status::Skip,
-                    name: 'unknown',
-                    label: $gateDef['name'],
-                    message: 'Error: '.$e->getMessage(),
-                    details: ['exception' => get_class($e), 'trace' => $e->getTraceAsString()],
-                ));
-            }
+        $gateResults = $this->gateRunner->run();
+
+        foreach ($gateResults as $gateResult) {
+            $result->add($gateResult);
         }
     }
 }

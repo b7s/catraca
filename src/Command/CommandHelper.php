@@ -3,7 +3,13 @@
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\AgentDetector;
+use B7S\Catraca\Baseline;
 use B7S\Catraca\CheckResult;
+use B7S\Catraca\Fixer\AutoloadFixer;
+use B7S\Catraca\Fixer\CodeStyleFixer;
+use B7S\Catraca\Fixer\ConditionOrderFixer;
+use B7S\Catraca\Fixer\FixerInterface;
+use B7S\Catraca\Fixer\PerformanceFixer;
 use B7S\Catraca\FixResult;
 use B7S\Catraca\Output\FixHumanFormatter;
 use B7S\Catraca\Output\FixJsonFormatter;
@@ -11,6 +17,7 @@ use B7S\Catraca\Output\GithubFormatter;
 use B7S\Catraca\Output\HumanFormatter;
 use B7S\Catraca\Output\JsonFormatter;
 use B7S\Catraca\ProjectResolver;
+use B7S\Catraca\ToolResolver;
 use JsonException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -21,6 +28,28 @@ use function sprintf;
 
 trait CommandHelper
 {
+    /** @return array<int, FixerInterface> */
+    private static function defaultFixers(): array
+    {
+        return [
+            new ConditionOrderFixer,
+            new PerformanceFixer,
+            new CodeStyleFixer,
+            new AutoloadFixer,
+        ];
+    }
+
+    private function runFixers(Baseline $baseline, ToolResolver $resolver): FixResult
+    {
+        $result = new FixResult;
+
+        foreach (self::defaultFixers() as $fixer) {
+            $result->add($fixer->fix($baseline, $resolver));
+        }
+
+        return $result;
+    }
+
     protected function addStandardOptions(): void
     {
         $this

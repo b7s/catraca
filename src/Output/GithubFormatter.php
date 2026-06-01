@@ -15,6 +15,8 @@ use function sprintf;
 
 class GithubFormatter
 {
+    use ActionRenderer;
+
     public function format(CheckResult $result): string
     {
         /** @var array<int, string> $lines */
@@ -56,12 +58,8 @@ class GithubFormatter
             $lines[] = '';
             $lines[] = 'Required Actions:';
             foreach ($actions as $i => $action) {
-                $lines[] = sprintf('  [%d] %s — %s', $i + 1, $action->type->value, $action->message);
-                $reasons = $action->reasons;
-                foreach (array_slice($action->files, 0, 10) as $j => $file) {
-                    $reason = isset($reasons[$j]) && $reasons[$j] !== '' ? ' — '.$reasons[$j] : '';
-                    $lines[] = sprintf('    - %s%s', $file, $reason);
-                }
+                $lines[] = sprintf(' [%d] %s — %s', $i + 1, $action->type->value, $action->message);
+                $this->appendActionFilesInline($lines, $action, ' - ', ' — ');
             }
         }
 

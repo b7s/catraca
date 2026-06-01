@@ -2,17 +2,17 @@
 
 namespace B7S\Catraca\Output;
 
-use B7S\Catraca\Action;
 use B7S\Catraca\CheckResult;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateResult;
 
-use function array_slice;
 use function count;
 use function sprintf;
+use function str_repeat;
 
 class HumanFormatter
 {
+    use ActionRenderer;
     use BoxDrawer;
 
     public function format(CheckResult $result): string
@@ -28,7 +28,7 @@ class HumanFormatter
             $icon = $this->icon($gate);
             $statusLabel = strtoupper($gate->status->value);
             $lines[] = sprintf(
-                '  %s %-24s %-8s %s',
+                ' %s %-24s %-8s %s',
                 $icon,
                 $gate->label,
                 $statusLabel,
@@ -40,7 +40,7 @@ class HumanFormatter
 
         $overall = $result->isPass() ? "\e[32mPASS\e[0m" : "\e[31mFAIL\e[0m";
         $summary = sprintf(
-            '  RESULT: %s — %d/%d gates passed',
+            ' RESULT: %s — %d/%d gates passed',
             $overall,
             $result->getPassedCount(),
             count($result->getGates())
@@ -53,12 +53,12 @@ class HumanFormatter
             $lines[] = $this->box('Required Actions');
             foreach ($actions as $i => $action) {
                 $lines[] = sprintf(
-                    "  \e[33m[%d]\e[0m \e[1m%s\e[0m — %s",
+                    " \e[33m[%d]\e[0m \e[1m%s\e[0m — %s",
                     $i + 1,
                     $action->type->value,
                     $action->message
                 );
-                $this->formatFiles($lines, $action);
+                $this->appendActionFilesMultiLine($lines, $action, ' → ', '   ');
             }
             $lines[] = '';
         }
@@ -82,12 +82,12 @@ class HumanFormatter
                 Status::Warn => '[WARN]',
                 Status::Skip => '[SKIP]',
             };
-            $lines[] = sprintf('  %s %-24s %s', $icon, $gate->label, $gate->message);
+            $lines[] = sprintf(' %s %-24s %s', $icon, $gate->label, $gate->message);
         }
 
         $lines[] = str_repeat('-', 50);
         $lines[] = sprintf(
-            '  RESULT: %s — %d/%d gates passed',
+            ' RESULT: %s — %d/%d gates passed',
             $result->isPass() ? 'PASS' : 'FAIL',
             $result->getPassedCount(),
             count($result->getGates())
@@ -98,14 +98,8 @@ class HumanFormatter
         if (count($actions) > 0) {
             $lines[] = 'Required Actions:';
             foreach ($actions as $i => $action) {
-                $lines[] = sprintf('  [%d] %s — %s', $i + 1, $action->type->value, $action->message);
-                $reasons = $action->reasons;
-                foreach (array_slice($action->files, 0, 10) as $j => $file) {
-                    $lines[] = sprintf('      -> %s', $file);
-                    if (isset($reasons[$j]) && $reasons[$j] !== '') {
-                        $lines[] = sprintf('         %s', $reasons[$j]);
-                    }
-                }
+                $lines[] = sprintf(' [%d] %s — %s', $i + 1, $action->type->value, $action->message);
+                $this->appendActionFilesMultiLine($lines, $action, ' -> ', '    ');
             }
             $lines[] = '';
         }
@@ -121,22 +115,5 @@ class HumanFormatter
             Status::Warn => "\e[33m⚠\e[0m",
             Status::Skip => "\e[90m—\e[0m",
         };
-    }
-
-    /**
-     * @param  array<int, string>  $lines
-     */
-    private function formatFiles(array &$lines, Action $action): void
-    {
-        $reasons = $action->reasons;
-        foreach (array_slice($action->files, 0, 10) as $i => $file) {
-            $lines[] = sprintf('      → %s', $file);
-            if (isset($reasons[$i]) && $reasons[$i] !== '') {
-                $lines[] = sprintf('        %s', $reasons[$i]);
-            }
-        }
-        if (count($action->files) > 10) {
-            $lines[] = sprintf('      → ... and %d more', count($action->files) - 10);
-        }
     }
 }
