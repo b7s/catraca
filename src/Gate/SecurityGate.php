@@ -14,9 +14,8 @@ use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Parallite\ForkExecutor;
 use Parallite\ParalliteClient;
-use RuntimeException;
-
 use Throwable;
+
 use function array_filter;
 use function array_keys;
 use function array_map;
@@ -152,6 +151,7 @@ readonly class SecurityGate implements GateInterface
 
     /**
      * @return array<string, array<int, string>>
+     *
      * @throws Throwable
      */
     private function runSubChecksParallel(string $root, array $paths, array $rules, int $releasedDays, ToolResolver $resolver): array
