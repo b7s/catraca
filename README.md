@@ -14,6 +14,21 @@ PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality 
 composer require --dev b7s/catraca
 ```
 
+## Quality Gates
+
+Gates run in order. A failure blocks the PR.
+
+| # | Gate | Tool                       | Default Threshold |
+|---|------|----------------------------|-------------------|
+| 1 | Security Audit | 15 built-in checks         | 0 critical/high advisories, 0 findings |
+| 2 | Code Style | `pint` or `php-cs-fixer`   | 0 violations |
+| 3 | Static Analysis | `phpstan` or `psalm`       | 0 errors (level 5 if no config) |
+| 4 | Test Coverage | `phpunit` or `pest`        | 85% minimum |
+| 5 | Duplication | `phpcpd`                   | 2% maximum |
+| 6 | File Size | Built-in                   | 1000 lines per file |
+| 7 | Cyclomatic Complexity | `phpmetrics`               | Block at 50, warn at 20 |
+| 8 | Performance | `php-cs-fixer` + Built-in  | 0 violations |
+
 ## Dependencies
 
 Catraca wraps your existing PHP quality tools. Install the ones you need:
@@ -281,20 +296,7 @@ Catraca auto-detects AI agents (Cursor, Claude Code, OpenCode, Gemini CLI, Codex
 
 Uses `::error::`, `::warning::`, and `::group::` annotations for native GitHub integration.
 
-## Quality Gates
-
-Gates run in order. A failure blocks the PR.
-
-| # | Gate | Tool | Default Threshold |
-|---|------|------|-------------------|
-| 1 | Security Audit | `composer audit` + 14 built-in checks | 0 critical/high advisories, 0 findings |
-| 2 | Code Style | `pint` or `php-cs-fixer` | 0 violations |
-| 3 | Static Analysis | `phpstan` or `psalm` | 0 errors (level 5 if no config) |
-| 4 | Test Coverage | `phpunit` or `pest` | 85% minimum |
-| 5 | Duplication | `phpcpd` | 2% maximum |
-| 6 | File Size | Built-in | 1000 lines per file |
-| 7 | Cyclomatic Complexity | `phpmetrics` | Block at 50, warn at 20 |
-| 8 | Performance | `php-cs-fixer` | 0 violations |
+### Security Gate
 
 The Security gate runs `composer audit` (always) plus 14 source-code checks (all enabled by default):
 
@@ -342,6 +344,8 @@ All rules are configurable in `catraca_baseline.json` under `security.rules`. Se
 ```
 
 CSRF and CORS checks only apply to Laravel projects — they are **skipped** (not failed) when no Laravel directory structure is detected.
+
+## Performance Gate
 
 The Performance gate runs `php-cs-fixer` with configurable rules (all enabled by default):
 
