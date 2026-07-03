@@ -11,7 +11,7 @@ PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality 
 ## Install
 
 ```bash
-composer require --dev b7s/catraca
+composer require b7s/catraca --dev
 ```
 
 ## Quality Gates
