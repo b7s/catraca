@@ -75,10 +75,16 @@ readonly class GateResult
 
         if ($this->baseline !== null) {
             $result['baseline'] = $this->baseline;
+        } else {
+            $result['baseline'] = [];
         }
+
         if ($this->current !== null) {
             $result['current'] = $this->current;
+        } else {
+            $result['current'] = [];
         }
+
         if ($this->actions !== null) {
             $result['actions'] = array_map(static fn (array $a): array => [
                 'type' => $a['type']->value,
@@ -87,6 +93,7 @@ readonly class GateResult
                 'reasons' => $a['reasons'] ?? [],
             ], $this->actions);
         }
+
         if ($this->details !== null) {
             $result['details'] = $this->details;
         }

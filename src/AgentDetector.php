@@ -15,6 +15,7 @@ final class AgentDetector
     /** @var list<string> */
     public const array ENV_VARS = [
         'AUGMENT_AGENT',
+        'AUGMENT_SESSION_ID',
         'AMP_CURRENT_THREAD_ID',
         'AI_AGENT',
         'CURSOR_TRACE_ID',
