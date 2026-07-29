@@ -18,14 +18,16 @@ class CoverageGate implements GateInterface
 {
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $phpunit = $resolver->resolve('phpunit');
-        if ($phpunit !== null) {
-            return $this->runPhpunit($phpunit, $baseline, $resolver);
-        }
+        $cwd = $resolver->getProjectRoot();
 
         $pest = $resolver->resolve('pest');
         if ($pest !== null) {
-            return $this->runPest($pest, $baseline, $resolver);
+            return $this->runRunner($pest, $baseline, $resolver, $cwd);
+        }
+
+        $phpunit = $resolver->resolve('phpunit');
+        if ($phpunit !== null) {
+            return $this->runRunner($phpunit, $baseline, $resolver, $cwd);
         }
 
         return new GateResult(
@@ -37,7 +39,7 @@ class CoverageGate implements GateInterface
         );
     }
 
-    private function runPhpunit(string $phpunit, Baseline $baseline, ToolResolver $resolver): GateResult
+    private function runRunner(string $runner, Baseline $baseline, ToolResolver $resolver, string $cwd): GateResult
     {
         $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
         if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
@@ -47,10 +49,9 @@ class CoverageGate implements GateInterface
         $cloverPath = $tmpDir.'/clover.xml';
 
         $process = new Process([
-            $resolver->resolvePhp(), $phpunit,
+            $resolver->resolvePhp(), $runner,
             '--coverage-clover='.$cloverPath,
-            '--coverage-text',
-        ]);
+        ], $cwd);
         $process->run();
 
         $coverage = $this->parseClover($cloverPath);
@@ -66,34 +67,6 @@ class CoverageGate implements GateInterface
         $message = $coverage !== null
             ? sprintf('%.2f%% (baseline: %.2f%%)', $coverage, $baselineCoverage)
             : 'Could not determine coverage (is xdebug or pcov enabled?)';
-
-        return new GateResult(
-            status: $status,
-            name: 'coverage',
-            label: 'Test Coverage',
-            message: $message,
-            severity: Severity::Block,
-            baseline: ['percentage' => $baselineCoverage],
-            current: ['percentage' => $coverage],
-            actions: $actions,
-        );
-    }
-
-    private function runPest(string $pest, Baseline $baseline, ToolResolver $resolver): GateResult
-    {
-        $process = new Process([
-            $resolver->resolvePhp(), $pest,
-            '--coverage',
-        ]);
-        $process->run();
-
-        $coverage = $this->parseCoverageFromText($process->getOutput());
-        $baselineCoverage = $this->getBaselineCoverage($baseline);
-        [$status, $actions] = $this->evaluateCoverage($coverage, $baselineCoverage);
-
-        $message = $coverage !== null
-            ? sprintf('%.2f%% (baseline: %.2f%%)', $coverage, $baselineCoverage)
-            : 'Could not determine coverage';
 
         return new GateResult(
             status: $status,
