@@ -58,7 +58,7 @@ readonly class PerformanceFixer implements FixerInterface
             return new FixerResult(
                 label: $this->getLabel(),
                 skipped: true,
-                message: 'skipped (install mago 1.45.0 or php-cs-fixer)',
+                message: 'skipped (install mago or php-cs-fixer)',
             );
         }
 

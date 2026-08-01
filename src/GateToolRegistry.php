@@ -48,7 +48,7 @@ final class GateToolRegistry
                 if ($version === null || !MagoVersionChecker::satisfies($version, $minimum)) {
                     if ($selected !== self::DEFAULT) {
                         throw new RuntimeException(sprintf(
-                            'Mago %s does not satisfy the required minimum version %s. Install Mago >= %s.',
+                            'Mago %s does not satisfy the required minimum version %s. install mago>= %s.',
                             $version ?? 'unknown',
                             $minimum,
                             $minimum,

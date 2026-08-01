@@ -45,7 +45,7 @@ readonly class StaticAnalysisGate implements GateInterface
             status: Status::Skip,
             name: 'static_analysis',
             label: 'Static Analysis',
-            message: 'No static analysis tool found (install mago 1.45.0, phpstan, or psalm)',
+            message: 'No static analysis tool found (install mago, phpstan, or psalm)',
             severity: Severity::Warn,
         );
     }

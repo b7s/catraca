@@ -46,7 +46,7 @@ readonly class StyleGate implements GateInterface
             status: Status::Skip,
             name: 'style',
             label: 'Code Style',
-            message: 'No code style tool found (install mago 1.45.0, pint, or php-cs-fixer)',
+            message: 'No code style tool found (install mago, pint, or php-cs-fixer)',
             severity: Severity::Warn,
         );
     }
