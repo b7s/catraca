@@ -57,7 +57,7 @@ final class ParallelTaskRunner
         $taskCount = count($tasks);
 
         while ($nextIndex < $taskCount || $active !== []) {
-            while (!$this->cancelled && $nextIndex < $taskCount && count($active) < $this->maxProcesses) {
+            while ($nextIndex < $taskCount && !$this->cancelled && count($active) < $this->maxProcesses) {
                 if ($onStarted !== null) {
                     $onStarted($nextIndex);
                 }

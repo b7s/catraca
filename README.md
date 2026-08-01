@@ -189,7 +189,7 @@ Configuration and measured results are stored separately:
 
 **`source_dirs.paths`** — which directories Catraca scans for PHP files. Only directories that exist on disk are used. If none of the configured directories exist, the project root is used as fallback. Defaults to `["src", "app", "lib"]`.
 
-**`config` and `results`** — `catraca init` updates only `results`, so thresholds, rule toggles, source paths, and parallel settings are never overwritten by a run. Existing `catraca/v1` files are migrated automatically on the next `init` or `check`.
+**`config` and `results`** — `catraca init` updates only `results`, so thresholds, rule toggles, source paths, and parallel settings are never overwritten by a run. Existing `catraca/v1` files are migrated automatically on the next `init` or `check`. During the v1 → v2 migration, each gate is configured to use the project's currently installed packages (for example Pint, PHPStan, or PHP CS Fixer) instead of Mago, so upgrading does not silently swap your existing toolchain. Mago stays the default only for new projects or when none of the other supported packages are installed.
 
 **`parallel.max_processes`** — maximum number of concurrent gate workers. The default is `4`; `128` is only a safety ceiling, not a machine requirement. Catraca starts at most one worker per gate, and machines with fewer CPU cores remain supported because the operating system schedules those workers. Gate workers do not create nested workers, preventing process fan-out on CI runners.
 

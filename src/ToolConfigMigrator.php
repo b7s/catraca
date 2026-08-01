@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace B7S\Catraca;
 
+use B7S\Catraca\ToolResolver;
+
 use function array_key_exists;
 use function is_array;
 use function is_string;
@@ -22,19 +24,43 @@ final class ToolConfigMigrator
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function migrate(array $data): array
+    public static function migrate(array $data, ?string $projectRoot = null): array
     {
         $config = self::object($data['config'] ?? null);
         $tools = self::object($config['tools'] ?? null);
+        $resolver = $projectRoot === null ? null : new ToolResolver($projectRoot);
+
+        $legacyMago = self::object($config['mago'] ?? null);
+        $hasLegacyToolKeys = false;
+        foreach (self::LEGACY_GATE_OPERATIONS as $gate => $operation) {
+            if (array_key_exists('tool', self::object($config[$gate] ?? null))) {
+                $hasLegacyToolKeys = true;
+
+                break;
+            }
+        }
+        $isV1 = $hasLegacyToolKeys || $legacyMago !== [];
 
         foreach (self::LEGACY_GATE_OPERATIONS as $gate => $operation) {
             $gateConfig = self::object($config[$gate] ?? null);
             $legacyTool = $gateConfig['tool'] ?? null;
+            $legacyToolName = is_string($legacyTool) ? $legacyTool : null;
             if (
-                ($tools[$operation] ?? GateToolRegistry::DEFAULT) === GateToolRegistry::DEFAULT
-                && is_string($legacyTool)
+                $legacyToolName !== null
+                && ($tools[$operation] ?? GateToolRegistry::DEFAULT) === GateToolRegistry::DEFAULT
             ) {
-                $tools[$operation] = strtolower($legacyTool);
+                $tools[$operation] = strtolower($legacyToolName);
+            }
+
+            if (
+                $isV1
+                && $resolver !== null
+                && ($tools[$operation] ?? GateToolRegistry::DEFAULT) === GateToolRegistry::DEFAULT
+            ) {
+                $detected = self::detectProjectTool($resolver, $gate);
+                if ($detected !== null) {
+                    $tools[$operation] = $detected;
+                }
             }
 
             unset($gateConfig['tool']);
@@ -91,6 +117,26 @@ final class ToolConfigMigrator
 
             $tools[$operation] = GateToolRegistry::FALLBACKS[$gate][1];
         }
+    }
+
+    /**
+     * Detects the first non-Mago tool installed in the project for a gate.
+     * Mago stays the default (via "auto") when no other package is present.
+     */
+    private static function detectProjectTool(ToolResolver $resolver, string $gate): ?string
+    {
+        $fallbacks = GateToolRegistry::FALLBACKS[$gate] ?? [];
+        foreach ($fallbacks as $candidate) {
+            if ($candidate === 'mago') {
+                continue;
+            }
+
+            if ($resolver->resolve($candidate) !== null) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed> */

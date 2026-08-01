@@ -22,10 +22,7 @@
     },
     "require-dev": {
         "carthage-software/mago": ">=1.45.0",
-        "friendsofphp/php-cs-fixer": "^3.95",
-        "laravel/pint": "^1.29",
         "phpmetrics/phpmetrics": "^2.9",
-        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^10.0 || ^11.0",
         "systemsdk/phpcpd": "^8.0 || ^9.0"
     },

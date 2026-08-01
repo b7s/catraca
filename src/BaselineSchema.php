@@ -124,12 +124,12 @@ final class BaselineSchema
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function normalize(array $data): array
+    public static function normalize(array $data, ?string $projectRoot = null): array
     {
         if (is_array($data['config'] ?? null) && is_array($data['results'] ?? null)) {
             $data['schema'] = Baseline::SCHEMA;
 
-            return ToolConfigMigrator::migrate($data);
+            return ToolConfigMigrator::migrate($data, $projectRoot);
         }
 
         $config = [];
@@ -181,7 +181,7 @@ final class BaselineSchema
             }
         }
 
-        return ToolConfigMigrator::migrate($normalized);
+        return ToolConfigMigrator::migrate($normalized, $projectRoot);
     }
 
     /**

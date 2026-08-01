@@ -71,7 +71,9 @@ class Baseline
 
         $this->cacheLoaded = true;
         $data = $this->store->read();
-        $this->cachedData = $data === null ? null : BaselineSchema::normalize($this->normalizeArray($data));
+        $this->cachedData = $data === null
+            ? null
+            : BaselineSchema::normalize($this->normalizeArray($data), $this->projectRoot);
 
         return $this->cachedData;
     }
@@ -81,7 +83,7 @@ class Baseline
      */
     public function write(array $data): void
     {
-        $data = $this->prepareForWrite(BaselineSchema::normalize($data));
+        $data = $this->prepareForWrite(BaselineSchema::normalize($data, $this->projectRoot));
         $this->store->write($data);
         $this->cachedData = $data;
         $this->cacheLoaded = true;
@@ -96,7 +98,9 @@ class Baseline
     public function updateResults(array $results): void
     {
         $data = $this->store->update(function (?array $stored) use ($results): array {
-            $data = $stored === null ? $this->defaults() : BaselineSchema::normalize($this->normalizeArray($stored));
+            $data = $stored === null
+                ? $this->defaults()
+                : BaselineSchema::normalize($this->normalizeArray($stored), $this->projectRoot);
             foreach ($results as $gate => $current) {
                 $data = $this->withGateResult($data, $gate, $current);
             }
@@ -120,7 +124,7 @@ class Baseline
             }
 
             return $this->prepareForWrite(BaselineSchema::mergeDefaults(
-                BaselineSchema::normalize($this->normalizeArray($stored)),
+                BaselineSchema::normalize($this->normalizeArray($stored), $this->projectRoot),
                 $defaults,
             ));
         });
