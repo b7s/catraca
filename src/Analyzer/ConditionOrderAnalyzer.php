@@ -63,13 +63,26 @@ readonly class ConditionOrderAnalyzer
     ];
 
     public const array SIDE_EFFECT_FUNCTIONS = [
-        'mkdir', 'rmdir', 'unlink', 'rename', 'copy', 'touch',
-        'file_put_contents', 'fwrite', 'fclose', 'chmod', 'chown', 'chgrp',
-        'symlink', 'link', 'opendir', 'closedir',
+        'mkdir',
+        'rmdir',
+        'unlink',
+        'rename',
+        'copy',
+        'touch',
+        'file_put_contents',
+        'fwrite',
+        'fclose',
+        'chmod',
+        'chown',
+        'chgrp',
+        'symlink',
+        'link',
+        'opendir',
+        'closedir',
     ];
 
     public function __construct(
-        private ParserFactory $parserFactory = new ParserFactory,
+        private ParserFactory $parserFactory = new ParserFactory(),
     ) {}
 
     /**
@@ -79,7 +92,7 @@ readonly class ConditionOrderAnalyzer
     public function analyze(array $paths): array
     {
         $parser = $this->parserFactory->createForHostVersion();
-        $nodeFinder = new NodeFinder;
+        $nodeFinder = new NodeFinder();
         $violations = [];
 
         foreach ($this->collectPhpFiles($paths) as $file) {
@@ -140,7 +153,7 @@ readonly class ConditionOrderAnalyzer
     {
         $files = [];
         foreach ($paths as $path) {
-            if (! is_dir($path)) {
+            if (!is_dir($path)) {
                 if (preg_match('/\.php$/', $path) === 1) {
                     $files[] = $path;
                 }
@@ -148,9 +161,10 @@ readonly class ConditionOrderAnalyzer
                 continue;
             }
 
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-            );
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(
+                $path,
+                FilesystemIterator::SKIP_DOTS,
+            ));
             $regexIterator = new RegexIterator($iterator, '/\.php$/');
 
             foreach ($regexIterator as $file) {
@@ -170,9 +184,9 @@ readonly class ConditionOrderAnalyzer
             $node instanceof Expr\ConstFetch,
             $node instanceof Expr\ClassConstFetch,
             $node instanceof Expr\Instanceof_,
-            $node instanceof Expr\Isset_ => 0,
+            $node instanceof Expr\Isset_,
+                => 0,
             $node instanceof Expr\Empty_ => $this->computeCost($node->expr),
-
             $node instanceof Expr\PropertyFetch => max(1, $this->computeCost($node->var)),
             $node instanceof Expr\NullsafePropertyFetch => max(1, $this->computeCost($node->var)),
             $node instanceof Expr\StaticPropertyFetch => max(1, $this->computeCost($node->class)),
@@ -182,7 +196,6 @@ readonly class ConditionOrderAnalyzer
                 $node->dim !== null ? $this->computeCost($node->dim) : 0,
             ),
             $node instanceof Expr\Array_ => $this->arrayCost($node),
-
             $node instanceof Expr\BinaryOp\Greater,
             $node instanceof Expr\BinaryOp\GreaterOrEqual,
             $node instanceof Expr\BinaryOp\Smaller,
@@ -195,30 +208,23 @@ readonly class ConditionOrderAnalyzer
             $node instanceof Expr\BinaryOp\Concat,
             $node instanceof BooleanAnd,
             $node instanceof BooleanOr,
-            $node instanceof Expr\BinaryOp => max(
-                $this->computeCost($node->left),
-                $this->computeCost($node->right),
-            ),
-
+            $node instanceof Expr\BinaryOp,
+                => max($this->computeCost($node->left), $this->computeCost($node->right)),
             $node instanceof Expr\MethodCall,
             $node instanceof Expr\NullsafeMethodCall,
             $node instanceof Expr\Assign,
             $node instanceof Expr\AssignOp,
             $node instanceof Expr\StaticCall,
-            $node instanceof Expr\New_ => 3,
-
+            $node instanceof Expr\New_,
+                => 3,
             $node instanceof Expr\BooleanNot => $this->computeCost($node->expr),
-
             $node instanceof Expr\FuncCall => $this->functionCallCost($node),
-
             $node instanceof Expr\Ternary => max(
                 $this->computeCost($node->cond),
                 $this->computeCost($node->if ?? $node->cond),
                 $this->computeCost($node->else),
             ),
-
             $node instanceof Expr\ErrorSuppress => $this->computeCost($node->expr),
-
             default => 2,
         };
     }
@@ -227,7 +233,7 @@ readonly class ConditionOrderAnalyzer
     {
         $name = $this->resolveFunctionName($node);
 
-        $baseCost = $name !== null ? (self::FUNCTION_COSTS[$name] ?? 3) : 3;
+        $baseCost = $name !== null ? self::FUNCTION_COSTS[$name] ?? 3 : 3;
 
         $argCosts = [];
         foreach ($node->args as $arg) {
@@ -262,7 +268,7 @@ readonly class ConditionOrderAnalyzer
 
     public function resolveFunctionName(Expr\FuncCall $node): ?string
     {
-        if (! $node->name instanceof Node\Name) {
+        if (!$node->name instanceof Node\Name) {
             return null;
         }
 
@@ -271,7 +277,7 @@ readonly class ConditionOrderAnalyzer
 
     public function hasSideEffects(BooleanAnd|BooleanOr $op): bool
     {
-        $nodeFinder = new NodeFinder;
+        $nodeFinder = new NodeFinder();
 
         /** @var array<int, Expr\FuncCall> $calls */
         $calls = $nodeFinder->findInstanceOf($op, Expr\FuncCall::class);

@@ -32,14 +32,14 @@ readonly class GateResult
 
     public function isFail(): bool
     {
-        return $this->status === Status::Fail;
+        return $this->status === Status::Fail || $this->status === Status::Cancelled;
     }
 
     public static function fromArray(array $data): self
     {
         $actions = null;
         if (isset($data['actions']) && is_array($data['actions'])) {
-            $actions = array_map(static fn (array $a): array => [
+            $actions = array_map(static fn(array $a): array => [
                 'type' => ActionType::from($a['type']),
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],
@@ -86,7 +86,7 @@ readonly class GateResult
         }
 
         if ($this->actions !== null) {
-            $result['actions'] = array_map(static fn (array $a): array => [
+            $result['actions'] = array_map(static fn(array $a): array => [
                 'type' => $a['type']->value,
                 'message' => $a['message'],
                 'files' => $a['files'] ?? [],

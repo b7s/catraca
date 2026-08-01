@@ -16,7 +16,7 @@ class ProjectResolver
         $rawPath = $rawPath ?? (string) getcwd();
         $projectRoot = realpath($rawPath);
 
-        if ($projectRoot === false || ! is_dir($projectRoot)) {
+        if ($projectRoot === false || !is_dir($projectRoot)) {
             return null;
         }
 

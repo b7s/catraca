@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Baseline;
@@ -12,14 +14,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(
-    name: 'check',
-    description: 'Run all quality gates and compare against baseline',
-)]
-class CheckCommand extends Command
+#[AsCommand(name: 'check', description: 'Run all quality gates and compare against baseline')]
+class CheckCommand extends ProjectCommand
 {
-    use CommandHelper;
-
     protected function configure(): void
     {
         $this->addStandardOptions();
@@ -29,19 +26,18 @@ class CheckCommand extends Command
     /**
      * @throws JsonException
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $projectRoot = $this->resolveProjectRoot($input, $output);
-        if ($projectRoot === null) {
-            return Command::FAILURE;
-        }
-
-        $catraca = new Catraca($projectRoot);
-        $result = $catraca->check();
-
+    protected function executeForProject(
+        InputInterface $input,
+        OutputInterface $output,
+        string $projectRoot,
+        Catraca $catraca,
+    ): int {
+        $result = $this->runCatraca($input, $output, $catraca);
         $this->formatResult($input, $output, $result);
 
-        if ($result->isPass() || ! $input->getOption('fix')) {
+        if ($result->isPass() || !$input->getOption('fix')) {
+            $this->saveRunIfEnabled($input, $projectRoot, $result);
+
             return $result->isPass() ? Command::SUCCESS : Command::FAILURE;
         }
 
@@ -50,14 +46,13 @@ class CheckCommand extends Command
         $baseline = new Baseline($projectRoot);
         $resolver = new ToolResolver($projectRoot);
         $fixResult = $this->runFixers($baseline, $resolver);
-
         $this->formatFixResult($input, $output, $fixResult);
 
         $output->writeln('');
 
-        $recheckResult = $catraca->check();
-
+        $recheckResult = $this->runCatraca($input, $output, $catraca);
         $this->formatResult($input, $output, $recheckResult);
+        $this->saveRunIfEnabled($input, $projectRoot, $recheckResult);
 
         return $recheckResult->isPass() ? Command::SUCCESS : Command::FAILURE;
     }

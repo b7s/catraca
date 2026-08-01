@@ -28,11 +28,11 @@ class FixHumanFormatter
             '  Fixed: %d | Skipped: %d | Errors: %d',
             $result->getFixedCount(),
             $result->getSkippedCount(),
-            $result->getErrorCount()
+            $result->getErrorCount(),
         );
         $lines[] = '';
 
-        return implode("\n", $lines)."\n";
+        return implode("\n", $lines) . "\n";
     }
 
     public function formatPlain(FixResult $result): string
@@ -52,11 +52,11 @@ class FixHumanFormatter
             'Fixed: %d | Skipped: %d | Errors: %d',
             $result->getFixedCount(),
             $result->getSkippedCount(),
-            $result->getErrorCount()
+            $result->getErrorCount(),
         );
         $lines[] = '';
 
-        return implode("\n", $lines)."\n";
+        return implode("\n", $lines) . "\n";
     }
 
     private function icon(FixerResult $fixer): string

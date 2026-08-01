@@ -17,7 +17,7 @@ trait ActionRenderer
     {
         $reasons = $action->reasons;
         foreach (array_slice($action->files, 0, 10) as $j => $file) {
-            $reason = isset($reasons[$j]) && $reasons[$j] !== '' ? $reasonSep.$reasons[$j] : '';
+            $reason = isset($reasons[$j]) && $reasons[$j] !== '' ? $reasonSep . $reasons[$j] : '';
             $lines[] = sprintf('%s%s%s', $filePrefix, $file, $reason);
         }
         if (count($action->files) > 10) {
@@ -28,8 +28,12 @@ trait ActionRenderer
     /**
      * @param  array<int, string>  $lines
      */
-    private function appendActionFilesMultiLine(array &$lines, Action $action, string $filePrefix, string $reasonPrefix): void
-    {
+    private function appendActionFilesMultiLine(
+        array &$lines,
+        Action $action,
+        string $filePrefix,
+        string $reasonPrefix,
+    ): void {
         $reasons = $action->reasons;
         foreach (array_slice($action->files, 0, 10) as $j => $file) {
             $lines[] = sprintf('%s%s', $filePrefix, $file);

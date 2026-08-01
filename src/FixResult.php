@@ -15,7 +15,7 @@ class FixResult
     private array $fixers = [];
 
     public function __construct(
-        public readonly DateTimeImmutable $timestamp = new DateTimeImmutable,
+        public readonly DateTimeImmutable $timestamp = new DateTimeImmutable(),
     ) {}
 
     public function add(FixerResult $result): void
@@ -31,17 +31,20 @@ class FixResult
 
     public function getFixedCount(): int
     {
-        return count(array_filter($this->fixers, static fn (FixerResult $f): bool => $f->fixed));
+        return count(array_filter($this->fixers, static fn(FixerResult $f): bool => $f->fixed));
     }
 
     public function getSkippedCount(): int
     {
-        return count(array_filter($this->fixers, static fn (FixerResult $f): bool => $f->skipped));
+        return count(array_filter($this->fixers, static fn(FixerResult $f): bool => $f->skipped));
     }
 
     public function getErrorCount(): int
     {
-        return count(array_filter($this->fixers, static fn (FixerResult $f): bool => ! $f->fixed && ! $f->skipped && $f->message !== ''));
+        return count(array_filter(
+            $this->fixers,
+            static fn(FixerResult $f): bool => !$f->fixed && !$f->skipped && $f->message !== '',
+        ));
     }
 
     /**
@@ -59,7 +62,7 @@ class FixResult
                 'skipped' => $this->getSkippedCount(),
                 'errors' => $this->getErrorCount(),
             ],
-            'fixers' => array_map(static fn (FixerResult $f): array => [
+            'fixers' => array_map(static fn(FixerResult $f): array => [
                 'label' => $f->label,
                 'fixed' => $f->fixed,
                 'skipped' => $f->skipped,

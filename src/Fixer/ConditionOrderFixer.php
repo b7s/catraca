@@ -27,7 +27,7 @@ use function sprintf;
 readonly class ConditionOrderFixer implements FixerInterface
 {
     public function __construct(
-        private SourcePathResolver $pathResolver = new SourcePathResolver,
+        private SourcePathResolver $pathResolver = new SourcePathResolver(),
     ) {}
 
     public function getLabel(): string
@@ -54,17 +54,13 @@ readonly class ConditionOrderFixer implements FixerInterface
 
     public function fix(Baseline $baseline, ToolResolver $resolver): FixerResult
     {
-        $enabledRules = $baseline->get('performance', 'rules', []);
-        if (! is_array($enabledRules) || ! ($enabledRules['condition_order'] ?? true)) {
-            return new FixerResult(
-                label: $this->getLabel(),
-                skipped: true,
-                message: 'condition_order check disabled',
-            );
+        $enabledRules = $baseline->getConfig('performance', 'rules', []);
+        if (!is_array($enabledRules) || !($enabledRules['condition_order'] ?? true)) {
+            return new FixerResult(label: $this->getLabel(), skipped: true, message: 'condition_order check disabled');
         }
 
-        $fixers = $baseline->get('performance', 'fixers', []);
-        if (! is_array($fixers) || ! ($fixers['condition_order'] ?? false)) {
+        $fixers = $baseline->getConfig('performance', 'fixers', []);
+        if (!is_array($fixers) || !($fixers['condition_order'] ?? false)) {
             return new FixerResult(
                 label: $this->getLabel(),
                 skipped: true,
@@ -73,15 +69,11 @@ readonly class ConditionOrderFixer implements FixerInterface
         }
 
         $paths = $this->pathResolver->resolve($resolver->getProjectRoot(), $baseline->getSourceDirs());
-        $analyzer = new ConditionOrderAnalyzer;
+        $analyzer = new ConditionOrderAnalyzer();
         $violations = $analyzer->analyze($paths);
 
         if ($violations === []) {
-            return new FixerResult(
-                label: $this->getLabel(),
-                skipped: true,
-                message: 'no condition order issues found',
-            );
+            return new FixerResult(label: $this->getLabel(), skipped: true, message: 'no condition order issues found');
         }
 
         $filesByPath = [];
@@ -90,9 +82,9 @@ readonly class ConditionOrderFixer implements FixerInterface
         }
 
         $fixedCount = 0;
-        $parser = (new ParserFactory)->createForHostVersion();
-        $nodeFinder = new NodeFinder;
-        $printer = new Standard;
+        $parser = (new ParserFactory())->createForHostVersion();
+        $nodeFinder = new NodeFinder();
+        $printer = new Standard();
 
         foreach ($filesByPath as $file => $fileViolations) {
             $content = file_get_contents($file);
@@ -112,7 +104,7 @@ readonly class ConditionOrderFixer implements FixerInterface
 
             $origTokens = $parser->getTokens();
 
-            $traverser = new NodeTraverser(new CloningVisitor);
+            $traverser = new NodeTraverser(new CloningVisitor());
             $ast = $traverser->traverse($origAst);
 
             /** @var array<int, BooleanAnd|BooleanOr> $booleanOps */
@@ -138,7 +130,7 @@ readonly class ConditionOrderFixer implements FixerInterface
                 }
             }
 
-            if (! $swapped) {
+            if (!$swapped) {
                 continue;
             }
 

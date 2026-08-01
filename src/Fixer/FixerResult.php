@@ -13,6 +13,6 @@ readonly class FixerResult
 
     public function isSuccess(): bool
     {
-        return $this->fixed && ! $this->skipped;
+        return $this->fixed && !$this->skipped;
     }
 }

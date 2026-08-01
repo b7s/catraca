@@ -18,7 +18,7 @@ final class ConditionOrderAnalyzerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->analyzer = new ConditionOrderAnalyzer;
+        $this->analyzer = new ConditionOrderAnalyzer();
     }
 
     public function test_detects_expensive_before_cheap_in_and(): void
@@ -422,7 +422,7 @@ final class ConditionOrderAnalyzerTest extends TestCase
 
     public function test_skips_non_php_files(): void
     {
-        $file = tempnam(sys_get_temp_dir(), 'catraca_test_').'.txt';
+        $file = tempnam(sys_get_temp_dir(), 'catraca_test_') . '.txt';
         file_put_contents($file, 'not php');
 
         $violations = $this->analyzer->analyze([$file]);
@@ -434,7 +434,7 @@ final class ConditionOrderAnalyzerTest extends TestCase
 
     public function test_skips_invalid_php_files(): void
     {
-        $file = tempnam(sys_get_temp_dir(), 'catraca_test_').'.php';
+        $file = tempnam(sys_get_temp_dir(), 'catraca_test_') . '.php';
         file_put_contents($file, '<?php this is not valid php {{');
 
         $violations = $this->analyzer->analyze([$file]);
@@ -446,7 +446,7 @@ final class ConditionOrderAnalyzerTest extends TestCase
 
     private function createTempFile(string $content): string
     {
-        $file = tempnam(sys_get_temp_dir(), 'catraca_test_').'.php';
+        $file = tempnam(sys_get_temp_dir(), 'catraca_test_') . '.php';
         file_put_contents($file, $content);
 
         return $file;

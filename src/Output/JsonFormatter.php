@@ -16,7 +16,7 @@ class JsonFormatter
     {
         $data = $result->toArray();
 
-        if (AgentDetector::isRunningInAgent() && ! $result->isPass()) {
+        if (AgentDetector::isRunningInAgent() && !$result->isPass()) {
             $fixAction = [
                 'type' => ActionType::RunFix->value,
                 'priority' => 0,
@@ -32,6 +32,9 @@ class JsonFormatter
             }
         }
 
-        return json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($asPretty ? JSON_PRETTY_PRINT : 0))."\n";
+        return (
+            json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | ($asPretty ? JSON_PRETTY_PRINT : 0))
+            . "\n"
+        );
     }
 }

@@ -8,4 +8,5 @@ enum Status: string
     case Fail = 'fail';
     case Skip = 'skip';
     case Warn = 'warn';
+    case Cancelled = 'cancelled';
 }

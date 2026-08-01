@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca;
 
 use B7S\Catraca\Gate\ComplexityGate;
@@ -11,79 +13,90 @@ use B7S\Catraca\Gate\SecurityGate;
 use B7S\Catraca\Gate\StaticAnalysisGate;
 use B7S\Catraca\Gate\StyleGate;
 
-use function is_array;
-
 class Catraca
 {
     private Baseline $baseline;
 
     private GateRunner $gateRunner;
 
-    public function __construct(string $projectRoot)
-    {
-        $this->baseline = new Baseline($projectRoot);
+    public function __construct(
+        string $projectRoot,
+        string $profile = 'default',
+        ?string $changedFrom = null,
+        ?int $timeoutOverride = null,
+    ) {
+        $this->baseline = new Baseline(
+            $projectRoot,
+            profile: $profile,
+            changedFrom: $changedFrom,
+            timeoutOverride: $timeoutOverride,
+        );
         $resolver = new ToolResolver($projectRoot);
 
         $gates = [
-            ['gate' => new SecurityGate, 'name' => 'Security Audit'],
-            ['gate' => new StyleGate, 'name' => 'Code Style'],
-            ['gate' => new StaticAnalysisGate, 'name' => 'Static Analysis'],
-            ['gate' => new CoverageGate, 'name' => 'Test Coverage'],
-            ['gate' => new DuplicationGate, 'name' => 'Duplication'],
-            ['gate' => new FileSizeGate, 'name' => 'File Size'],
-            ['gate' => new ComplexityGate, 'name' => 'Cyclomatic Complexity'],
-            ['gate' => new PerformanceGate, 'name' => 'Performance'],
+            ['gate' => new SecurityGate(), 'name' => 'Security Audit'],
+            ['gate' => new StyleGate(), 'name' => 'Code Style'],
+            ['gate' => new StaticAnalysisGate(), 'name' => 'Static Analysis'],
+            ['gate' => new CoverageGate(), 'name' => 'Test Coverage'],
+            ['gate' => new DuplicationGate(), 'name' => 'Duplication'],
+            ['gate' => new FileSizeGate(), 'name' => 'File Size'],
+            ['gate' => new ComplexityGate(), 'name' => 'Cyclomatic Complexity'],
+            ['gate' => new PerformanceGate(), 'name' => 'Performance'],
         ];
 
         $this->gateRunner = new GateRunner($this->baseline, $resolver, $gates);
     }
 
-    public function init(): CheckResult
+    /**
+     * @return array<int, string>
+     */
+    public function getGateLabels(): array
     {
-        $result = new CheckResult;
+        return $this->gateRunner->getLabels();
+    }
+
+    public function cancel(): void
+    {
+        $this->gateRunner->cancel();
+    }
+
+    public function init(?GateRunObserverInterface $observer = null): CheckResult
+    {
+        $result = new CheckResult();
 
         $this->baseline->init();
-
-        $this->runGates($result);
-
+        $this->runGates($result, $observer);
         $this->writeBaseline($result);
 
         return $result;
     }
 
-    public function check(): CheckResult
+    public function check(?GateRunObserverInterface $observer = null): CheckResult
     {
         $this->baseline->init();
 
-        $result = new CheckResult;
-
-        $this->runGates($result);
+        $result = new CheckResult();
+        $this->runGates($result, $observer);
 
         return $result;
     }
 
     private function writeBaseline(CheckResult $result): void
     {
-        $existing = $this->baseline->read() ?? [];
-        $data = $existing;
+        $results = [];
 
         foreach ($result->getGates() as $gate) {
             if ($gate->current !== null) {
-                $data[$gate->name] = array_merge(
-                    is_array($existing[$gate->name] ?? null) ? $existing[$gate->name] : [],
-                    $gate->current,
-                );
+                $results[$gate->name] = $gate->current;
             }
         }
 
-        $this->baseline->write($data);
+        $this->baseline->updateResults($results);
     }
 
-    private function runGates(CheckResult $result): void
+    private function runGates(CheckResult $result, ?GateRunObserverInterface $observer): void
     {
-        $gateResults = $this->gateRunner->run();
-
-        foreach ($gateResults as $gateResult) {
+        foreach ($this->gateRunner->run($observer) as $gateResult) {
             $result->add($gateResult);
         }
     }

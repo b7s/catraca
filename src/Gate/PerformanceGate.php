@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Analyzer\ConditionOrderAnalyzer;
@@ -10,6 +12,8 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\GateToolRegistry;
+use B7S\Catraca\MagoRunner;
 use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
@@ -23,8 +27,11 @@ use function sprintf;
 
 readonly class PerformanceGate implements GateInterface
 {
+    private const int MAX_VIOLATIONS = 0;
+
     public function __construct(
-        private SourcePathResolver $pathResolver = new SourcePathResolver,
+        private SourcePathResolver $pathResolver = new SourcePathResolver(),
+        private MagoRunner $magoRunner = new MagoRunner(),
     ) {}
 
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
@@ -36,20 +43,41 @@ readonly class PerformanceGate implements GateInterface
         $hasTool = false;
 
         $enabledRules = $this->getEnabledRules($baseline);
-        $fixer = $resolver->resolve('php-cs-fixer');
-        $sourceDirs = $baseline->getSourceDirs();
-        $paths = $this->pathResolver->resolve($resolver->getProjectRoot(), $sourceDirs);
+        $tool = GateToolRegistry::resolve($baseline, $resolver, 'performance');
+        $mago = $tool?->name === 'mago' ? $tool->path : null;
+        $fixer = $tool?->name === 'php-cs-fixer' ? $tool->path : null;
+        $paths = $this->pathResolver->resolveForBaseline($baseline);
 
-        if ($fixer !== null) {
+        if ($mago !== null) {
+            $result = $this->magoRunner->diagnostics($mago, 'lint', $paths, $baseline);
+            $hasTool = true;
+            $violations = $result->issueCount();
+            $files = $result->files();
+
+            foreach ($result->issues as $issue) {
+                $prefix = $issue['code'] === '' ? '' : $issue['code'] . ': ';
+                $reasons[] = $prefix . $issue['message'];
+            }
+
+            if ($violations > self::MAX_VIOLATIONS) {
+                $messages[] = sprintf('%d Mago lint improvement(s) available', $violations);
+            }
+        } elseif ($fixer !== null) {
             $rulesJson = self::buildRulesJson($enabledRules);
 
             if ($rulesJson !== '{}') {
-                $result = $this->runCsFixerRules($fixer, $resolver, $rulesJson, $paths);
+                $result = $this->runCsFixerRules(
+                    $fixer,
+                    $resolver,
+                    $rulesJson,
+                    $paths,
+                    $baseline->getGateTimeout('performance'),
+                );
                 $hasTool = true;
                 $violations = $result['violations'];
                 $files = $result['files'];
 
-                if ($violations > 0) {
+                if ($violations > self::MAX_VIOLATIONS) {
                     $messages[] = sprintf('%d files with performance improvements available', $violations);
                 }
             }
@@ -61,7 +89,7 @@ readonly class PerformanceGate implements GateInterface
                 $hasTool = true;
                 $violations += $autoloadResult['violations'];
                 $files = array_merge($files, $autoloadResult['files']);
-                if ($autoloadResult['violations'] > 0) {
+                if ($autoloadResult['violations'] > self::MAX_VIOLATIONS) {
                     $messages[] = $autoloadResult['message'];
                 }
             }
@@ -73,12 +101,12 @@ readonly class PerformanceGate implements GateInterface
             $violations += $conditionResult['violations'];
             $files = array_merge($files, $conditionResult['files']);
             $reasons = array_merge($reasons, $conditionResult['reasons']);
-            if ($conditionResult['violations'] > 0) {
+            if ($conditionResult['violations'] > self::MAX_VIOLATIONS) {
                 $messages[] = $conditionResult['message'];
             }
         }
 
-        if (! $hasTool) {
+        if (!$hasTool) {
             return new GateResult(
                 status: Status::Skip,
                 name: 'performance',
@@ -88,11 +116,15 @@ readonly class PerformanceGate implements GateInterface
             );
         }
 
-        $baselineViolations = $baseline->get('performance', 'violations', 0);
+        $baselineViolations = $baseline->getResult('performance', 'violations', self::MAX_VIOLATIONS);
         [$status, $actions] = $this->evaluateViolations($violations, $files, $messages, $reasons);
 
-        $message = $violations > 0
-            ? sprintf('%d improvement(s) found (baseline: %d)', $violations, is_int($baselineViolations) ? $baselineViolations : 0)
+        $message = $violations > self::MAX_VIOLATIONS
+            ? sprintf(
+                '%d improvement(s) found (baseline: %d)',
+                $violations,
+                is_int($baselineViolations) ? $baselineViolations : self::MAX_VIOLATIONS,
+            )
             : 'No performance improvements needed';
 
         return new GateResult(
@@ -176,7 +208,7 @@ readonly class PerformanceGate implements GateInterface
         $registry = self::getRuleRegistry();
         $rules = [];
         foreach ($registry as $key => $config) {
-            if (! ($enabledRules[$key] ?? false)) {
+            if (!($enabledRules[$key] ?? false)) {
                 continue;
             }
             $decoded = json_decode($config['rule'], true);
@@ -197,7 +229,7 @@ readonly class PerformanceGate implements GateInterface
      */
     private function getEnabledRules(Baseline $baseline): array
     {
-        $rules = $baseline->get('performance', 'rules', []);
+        $rules = $baseline->getConfig('performance', 'rules', []);
         if (is_array($rules) && $rules !== []) {
             return $rules;
         }
@@ -208,23 +240,29 @@ readonly class PerformanceGate implements GateInterface
         return $defaults;
     }
 
-    private function runCsFixerRules(string $fixer, ToolResolver $resolver, string $rulesJson, array $paths): array
-    {
+    private function runCsFixerRules(
+        string $fixer,
+        ToolResolver $resolver,
+        string $rulesJson,
+        array $paths,
+        ?float $timeout,
+    ): array {
         $cmd = [
-            $resolver->resolvePhp(), $fixer,
+            $resolver->resolvePhp(),
+            $fixer,
             'fix',
             '--dry-run',
             '--diff',
             '--allow-risky=yes',
             '--using-cache=no',
             '--format=json',
-            '--rules='.$rulesJson,
+            '--rules=' . $rulesJson,
         ];
         foreach ($paths as $path) {
             $cmd[] = $path;
         }
 
-        $process = new Process($cmd);
+        $process = new Process($cmd, timeout: $timeout);
         $process->run();
 
         return CsFixerResultParser::parseJsonOutput($process->getOutput());
@@ -240,9 +278,9 @@ readonly class PerformanceGate implements GateInterface
             return null;
         }
 
-        $autoloadFile = $resolver->getProjectRoot().'/vendor/composer/autoload_classmap.php';
+        $autoloadFile = $resolver->getProjectRoot() . '/vendor/composer/autoload_classmap.php';
 
-        if (! file_exists($autoloadFile)) {
+        if (!file_exists($autoloadFile)) {
             return [
                 'violations' => 1,
                 'files' => [],
@@ -263,7 +301,7 @@ readonly class PerformanceGate implements GateInterface
      */
     private function checkConditionOrder(array $paths): array
     {
-        $analyzer = new ConditionOrderAnalyzer;
+        $analyzer = new ConditionOrderAnalyzer();
         $violations = $analyzer->analyze($paths);
 
         if ($violations === []) {
@@ -278,7 +316,7 @@ readonly class PerformanceGate implements GateInterface
         $files = [];
         $reasons = [];
         foreach ($violations as $v) {
-            $files[] = $v['file'].':'.$v['line'];
+            $files[] = $v['file'] . ':' . $v['line'];
             $reasons[] = $v['message'];
         }
 
@@ -286,7 +324,10 @@ readonly class PerformanceGate implements GateInterface
             'violations' => count($violations),
             'files' => $files,
             'reasons' => $reasons,
-            'message' => sprintf('%d condition order issues — cheaper conditions should come first', count($violations)),
+            'message' => sprintf(
+                '%d condition order issues — cheaper conditions should come first',
+                count($violations),
+            ),
         ];
     }
 

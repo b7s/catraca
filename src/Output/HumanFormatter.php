@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Output;
 
 use B7S\Catraca\CheckResult;
@@ -9,6 +11,7 @@ use B7S\Catraca\GateResult;
 use function count;
 use function sprintf;
 use function str_repeat;
+use function strtoupper;
 
 class HumanFormatter
 {
@@ -25,45 +28,29 @@ class HumanFormatter
         $lines[] = $this->divider();
 
         foreach ($result->getGates() as $gate) {
-            $icon = $this->icon($gate);
-            $statusLabel = strtoupper($gate->status->value);
             $lines[] = sprintf(
                 ' %s %-24s %-8s %s',
-                $icon,
+                $this->icon($gate),
                 $gate->label,
-                $statusLabel,
-                $gate->message
+                strtoupper($gate->status->value),
+                $gate->message,
             );
         }
 
-        $lines[] = $this->divider();
+        $this->appendSummary($lines, $result, includeDivider: true);
 
-        $overall = $result->isPass() ? "\e[32mPASS\e[0m" : "\e[31mFAIL\e[0m";
-        $summary = sprintf(
-            ' RESULT: %s — %d/%d gates passed',
-            $overall,
-            $result->getPassedCount(),
-            count($result->getGates())
-        );
-        $lines[] = $summary;
-        $lines[] = '';
+        return implode("\n", $lines) . "\n";
+    }
 
-        $actions = $result->getActions();
-        if (count($actions) > 0) {
-            $lines[] = $this->box('Required Actions');
-            foreach ($actions as $i => $action) {
-                $lines[] = sprintf(
-                    " \e[33m[%d]\e[0m \e[1m%s\e[0m — %s",
-                    $i + 1,
-                    $action->type->value,
-                    $action->message
-                );
-                $this->appendActionFilesMultiLine($lines, $action, ' → ', '   ');
-            }
-            $lines[] = '';
-        }
+    /**
+     * Used after the live table, which already contains every gate row.
+     */
+    public function formatSummary(CheckResult $result): string
+    {
+        $lines = [];
+        $this->appendSummary($lines, $result, includeDivider: false);
 
-        return implode("\n", $lines)."\n";
+        return implode("\n", $lines) . "\n";
     }
 
     public function formatPlain(CheckResult $result): string
@@ -81,6 +68,7 @@ class HumanFormatter
                 Status::Fail => '[FAIL]',
                 Status::Warn => '[WARN]',
                 Status::Skip => '[SKIP]',
+                Status::Cancelled => '[CANCELLED]',
             };
             $lines[] = sprintf(' %s %-24s %s', $icon, $gate->label, $gate->message);
         }
@@ -90,21 +78,57 @@ class HumanFormatter
             ' RESULT: %s — %d/%d gates passed',
             $result->isPass() ? 'PASS' : 'FAIL',
             $result->getPassedCount(),
-            count($result->getGates())
+            count($result->getGates()),
         );
         $lines[] = '';
 
         $actions = $result->getActions();
         if (count($actions) > 0) {
             $lines[] = 'Required Actions:';
-            foreach ($actions as $i => $action) {
-                $lines[] = sprintf(' [%d] %s — %s', $i + 1, $action->type->value, $action->message);
+            foreach ($actions as $index => $action) {
+                $lines[] = sprintf(' [%d] %s — %s', $index + 1, $action->type->value, $action->message);
                 $this->appendActionFilesMultiLine($lines, $action, ' -> ', '    ');
             }
             $lines[] = '';
         }
 
-        return implode("\n", $lines)."\n";
+        return implode("\n", $lines) . "\n";
+    }
+
+    /**
+     * @param  array<int, string>  $lines
+     */
+    private function appendSummary(array &$lines, CheckResult $result, bool $includeDivider): void
+    {
+        if ($includeDivider) {
+            $lines[] = $this->divider();
+        }
+
+        $overall = $result->isPass() ? "\e[32mPASS\e[0m" : "\e[31mFAIL\e[0m";
+        $lines[] = sprintf(
+            ' RESULT: %s — %d/%d gates passed',
+            $overall,
+            $result->getPassedCount(),
+            count($result->getGates()),
+        );
+        $lines[] = '';
+
+        $actions = $result->getActions();
+        if (count($actions) === 0) {
+            return;
+        }
+
+        $lines[] = $this->box('Required Actions');
+        foreach ($actions as $index => $action) {
+            $lines[] = sprintf(
+                " \e[33m[%d]\e[0m \e[1m%s\e[0m — %s",
+                $index + 1,
+                $action->type->value,
+                $action->message,
+            );
+            $this->appendActionFilesMultiLine($lines, $action, ' → ', '   ');
+        }
+        $lines[] = '';
     }
 
     private function icon(GateResult $gate): string
@@ -114,6 +138,7 @@ class HumanFormatter
             Status::Fail => "\e[31m✘\e[0m",
             Status::Warn => "\e[33m⚠\e[0m",
             Status::Skip => "\e[90m—\e[0m",
+            Status::Cancelled => "\e[31m�\e[0m",
         };
     }
 }

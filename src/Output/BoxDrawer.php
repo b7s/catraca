@@ -17,6 +17,6 @@ trait BoxDrawer
 
     private function divider(int $width = 60): string
     {
-        return '  '.str_repeat('─', $width);
+        return '  ' . str_repeat('─', $width);
     }
 }

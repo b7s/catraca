@@ -21,7 +21,7 @@ class CsFixerResultParser
 
             if (is_array($fileEntries)) {
                 foreach ($fileEntries as $value) {
-                    if (! is_array($value)) {
+                    if (!is_array($value)) {
                         continue;
                     }
                     $filePath = $value['name'] ?? $value['file'] ?? null;

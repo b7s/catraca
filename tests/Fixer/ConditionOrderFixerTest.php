@@ -20,8 +20,8 @@ final class ConditionOrderFixerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir().'/catraca_fixer_test_'.str_replace('.', '_', uniqid('', true));
-        mkdir($this->tmpDir.'/src', 0755, true);
+        $this->tmpDir = sys_get_temp_dir() . '/catraca_fixer_test_' . str_replace('.', '_', uniqid('', true));
+        mkdir($this->tmpDir . '/src', 0755, true);
     }
 
     protected function tearDown(): void
@@ -31,7 +31,7 @@ final class ConditionOrderFixerTest extends TestCase
 
     public function test_fixes_expensive_before_cheap(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -42,7 +42,7 @@ class Test {
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -57,7 +57,7 @@ class Test {
 
     public function test_skips_when_check_disabled(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -68,7 +68,7 @@ class Test {
 
         $baseline = $this->createBaseline(['condition_order' => false]);
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -80,7 +80,7 @@ class Test {
 
     public function test_skips_when_fix_disabled(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -91,7 +91,7 @@ class Test {
 
         $baseline = $this->createBaseline(['condition_order' => true], ['condition_order' => false]);
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -103,7 +103,7 @@ class Test {
 
     public function test_skips_when_no_issues(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -114,7 +114,7 @@ class Test {
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -126,7 +126,7 @@ class Test {
 
     public function test_does_not_swap_side_effect_expressions(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -137,7 +137,7 @@ class Test {
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -152,7 +152,7 @@ class Test {
 
     public function test_fixes_or_expression(): void
     {
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, '<?php
 class Test {
     public function run() {
@@ -163,7 +163,7 @@ class Test {
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -178,12 +178,12 @@ class Test {
     public function test_preserves_formatting_blank_lines_and_spacing(): void
     {
         $original = "<?php\n\ndeclare(strict_types=1);\n\nnamespace App;\n\nuse App\Service;\n\nclass Test {\n    public function run() {\n        // important comment\n        if (\$this->expensive() && \$x > 0) {\n            return true;\n        }\n\n        return false;\n    }\n}\n";
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, $original);
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -201,12 +201,12 @@ class Test {
     public function test_adds_parens_around_coalesce_when_swapped(): void
     {
         $original = "<?php\n\n\$this->expensive() && (\$x ?? false);\n";
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, $original);
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -221,12 +221,12 @@ class Test {
     public function test_adds_parens_around_ternary_when_swapped(): void
     {
         $original = "<?php\n\n\$this->expensive() && (\$x ? \$y : \$z);\n";
-        $file = $this->tmpDir.'/src/Test.php';
+        $file = $this->tmpDir . '/src/Test.php';
         file_put_contents($file, $original);
 
         $baseline = $this->createBaseline();
         $resolver = new ToolResolver($this->tmpDir);
-        $fixer = new ConditionOrderFixer;
+        $fixer = new ConditionOrderFixer();
 
         $result = $fixer->fix($baseline, $resolver);
 
@@ -238,8 +238,10 @@ class Test {
         unlink($file);
     }
 
-    private function createBaseline(array $rules = ['condition_order' => true], array $fixers = ['condition_order' => true]): Baseline
-    {
+    private function createBaseline(
+        array $rules = ['condition_order' => true],
+        array $fixers = ['condition_order' => true],
+    ): Baseline {
         $baseline = new Baseline($this->tmpDir);
         $baseline->write([
             'performance' => ['violations' => 0, 'rules' => $rules, 'fixers' => $fixers],
@@ -250,7 +252,7 @@ class Test {
 
     private function rmDir(string $dir): void
     {
-        if (! is_dir($dir)) {
+        if (!is_dir($dir)) {
             return;
         }
 

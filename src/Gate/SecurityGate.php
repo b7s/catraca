@@ -64,7 +64,7 @@ readonly class SecurityGate implements GateInterface
     ];
 
     public function __construct(
-        private SourcePathResolver $pathResolver = new SourcePathResolver,
+        private SourcePathResolver $pathResolver = new SourcePathResolver(),
     ) {}
 
     /**
@@ -74,8 +74,7 @@ readonly class SecurityGate implements GateInterface
     {
         $rules = $this->getEnabledRules($baseline);
         $root = $baseline->projectRoot;
-        $sourceDirs = $baseline->getSourceDirs();
-        $paths = $this->pathResolver->resolve($root, $sourceDirs);
+        $paths = $this->pathResolver->resolveForBaseline($baseline);
         $releasedDays = $this->getReleasedDays($baseline);
         $parallel = $baseline->isParallelEnabled() && ForkExecutor::isAvailable();
 
@@ -91,16 +90,18 @@ readonly class SecurityGate implements GateInterface
         $allFindings = array_merge(...array_values($findingsByRule));
         $totalFindings = count($allFindings);
         $criticalAdvisoryCount = $composerAudit['critical'];
-        $baselineAdvisoryCount = $baseline->get('security', 'advisories', 0);
+        $baselineAdvisoryCount = $baseline->getResult('security', 'advisories', 0);
 
+        $baselineFindings = $baseline->getResult('security', 'findings', 0);
+        $baselineFindings = is_int($baselineFindings) ? $baselineFindings : 0;
         $status = Status::Pass;
         $actions = null;
 
         if ($totalFindings > 0 || $criticalAdvisoryCount > 0) {
             $status = Status::Fail;
-            $activeRules = array_filter($findingsByRule, static fn (array $f): bool => $f !== []);
+            $activeRules = array_filter($findingsByRule, static fn(array $f): bool => $f !== []);
             $ruleSummaries = array_map(
-                static fn (string $rule): string => $rule.': '.count($findingsByRule[$rule]).' finding(s)',
+                static fn(string $rule): string => $rule . ': ' . count($findingsByRule[$rule]) . ' finding(s)',
                 array_keys($activeRules),
             );
             if ($criticalAdvisoryCount > 0) {
@@ -119,7 +120,7 @@ readonly class SecurityGate implements GateInterface
             label: 'Security Audit',
             message: sprintf('%d finding(s), %d critical/high advisories', $totalFindings, $criticalAdvisoryCount),
             severity: Severity::Block,
-            baseline: ['advisories' => $baselineAdvisoryCount],
+            baseline: ['advisories' => $baselineAdvisoryCount, 'findings' => $baselineFindings],
             current: ['findings' => $totalFindings, 'critical' => $criticalAdvisoryCount],
             actions: $actions,
             details: $findingsByRule,
@@ -129,13 +130,18 @@ readonly class SecurityGate implements GateInterface
     /**
      * @return array<string, array<int, string>>
      */
-    private function runSubChecksSequential(string $root, array $paths, array $rules, int $releasedDays, ToolResolver $resolver): array
-    {
+    private function runSubChecksSequential(
+        string $root,
+        array $paths,
+        array $rules,
+        int $releasedDays,
+        ToolResolver $resolver,
+    ): array {
         $sub = new SecuritySubCheck($root, $paths);
         $findingsByRule = [];
 
         foreach (self::SUB_CHECK_METHODS as $rule => $method) {
-            if (! ($rules[$rule] ?? true)) {
+            if (!($rules[$rule] ?? true)) {
                 $findingsByRule[$rule] = [];
 
                 continue;
@@ -154,14 +160,19 @@ readonly class SecurityGate implements GateInterface
      *
      * @throws Throwable
      */
-    private function runSubChecksParallel(string $root, array $paths, array $rules, int $releasedDays, ToolResolver $resolver): array
-    {
-        $client = new ParalliteClient;
+    private function runSubChecksParallel(
+        string $root,
+        array $paths,
+        array $rules,
+        int $releasedDays,
+        ToolResolver $resolver,
+    ): array {
+        $client = new ParalliteClient();
         $closures = [];
         $ruleOrder = [];
 
         foreach (self::SUB_CHECK_METHODS as $rule => $method) {
-            if (! ($rules[$rule] ?? true)) {
+            if (!($rules[$rule] ?? true)) {
                 continue;
             }
 
@@ -169,7 +180,7 @@ readonly class SecurityGate implements GateInterface
             $isPackageFreshness = $rule === 'package_freshness';
             $args = $isPackageFreshness ? [$releasedDays] : [];
 
-            $closures[] = static fn () => (new SecuritySubCheck($root, $paths))->{$method}(...$args);
+            $closures[] = static fn() => (new SecuritySubCheck($root, $paths))->{$method}(...$args);
         }
 
         $rawResults = $client->awaitAll($closures);
@@ -177,11 +188,11 @@ readonly class SecurityGate implements GateInterface
         $findingsByRule = [];
         foreach ($ruleOrder as $i => $rule) {
             $data = $rawResults[$i] ?? null;
-            $findingsByRule[$rule] = (! is_array($data)) ? [] : $data;
+            $findingsByRule[$rule] = !is_array($data) ? [] : $data;
         }
 
         foreach (array_keys(self::SUB_CHECK_METHODS) as $rule) {
-            if (! isset($findingsByRule[$rule])) {
+            if (!isset($findingsByRule[$rule])) {
                 $findingsByRule[$rule] = [];
             }
         }
@@ -194,7 +205,7 @@ readonly class SecurityGate implements GateInterface
      */
     private function getEnabledRules(Baseline $baseline): array
     {
-        $rules = $baseline->get('security', 'rules', null);
+        $rules = $baseline->getConfig('security', 'rules', null);
         if (is_array($rules) && $rules !== []) {
             return $rules;
         }
@@ -204,7 +215,7 @@ readonly class SecurityGate implements GateInterface
 
     private function getReleasedDays(Baseline $baseline): int
     {
-        $days = $baseline->get('security', 'released_days', null);
+        $days = $baseline->getConfig('security', 'released_days', null);
         if (is_int($days) && $days > 0) {
             return $days;
         }

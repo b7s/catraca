@@ -16,7 +16,7 @@ class CheckResult
     private array $gates = [];
 
     public function __construct(
-        public readonly DateTimeImmutable $timestamp = new DateTimeImmutable,
+        public readonly DateTimeImmutable $timestamp = new DateTimeImmutable(),
     ) {}
 
     public function add(GateResult $gate): void
@@ -80,7 +80,7 @@ class CheckResult
 
         foreach (['errors', 'clones', 'oversized'] as $key) {
             $items = $details[$key] ?? null;
-            if (! is_array($items)) {
+            if (!is_array($items)) {
                 continue;
             }
             foreach ($items as $item) {
@@ -103,17 +103,17 @@ class CheckResult
 
     public function getPassedCount(): int
     {
-        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->isPass()));
+        return count(array_filter($this->gates, static fn(GateResult $g): bool => $g->isPass()));
     }
 
     public function getFailedCount(): int
     {
-        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->isFail()));
+        return count(array_filter($this->gates, static fn(GateResult $g): bool => $g->isFail()));
     }
 
     public function getSkippedCount(): int
     {
-        return count(array_filter($this->gates, static fn (GateResult $g): bool => $g->status === Status::Skip));
+        return count(array_filter($this->gates, static fn(GateResult $g): bool => $g->status === Status::Skip));
     }
 
     /**
@@ -132,8 +132,8 @@ class CheckResult
                 'failed' => $this->getFailedCount(),
                 'skipped' => $this->getSkippedCount(),
             ],
-            'gates' => array_map(static fn (GateResult $g): array => $g->toArray(), $this->gates),
-            'actions' => array_map(static fn (Action $a): array => $a->toArray(), $this->getActions()),
+            'gates' => array_map(static fn(GateResult $g): array => $g->toArray(), $this->gates),
+            'actions' => array_map(static fn(Action $a): array => $a->toArray(), $this->getActions()),
         ];
     }
 }

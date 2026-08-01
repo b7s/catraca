@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Baseline;
@@ -12,14 +14,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-#[AsCommand(
-    name: 'fix',
-    description: 'Auto-fix code style and performance issues',
-)]
-class FixCommand extends Command
+#[AsCommand(name: 'fix', description: 'Auto-fix code style and performance issues')]
+class FixCommand extends ProjectCommand
 {
-    use CommandHelper;
-
     protected function configure(): void
     {
         $this->addStandardOptions();
@@ -29,17 +26,15 @@ class FixCommand extends Command
     /**
      * @throws JsonException
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $projectRoot = $this->resolveProjectRoot($input, $output);
-        if ($projectRoot === null) {
-            return Command::FAILURE;
-        }
-
+    protected function executeForProject(
+        InputInterface $input,
+        OutputInterface $output,
+        string $projectRoot,
+        Catraca $catraca,
+    ): int {
         $baseline = new Baseline($projectRoot);
         $resolver = new ToolResolver($projectRoot);
         $result = $this->runFixers($baseline, $resolver);
-
         $this->formatFixResult($input, $output, $result);
 
         if ($input->getOption('no-check')) {
@@ -48,9 +43,7 @@ class FixCommand extends Command
 
         $output->writeln('');
 
-        $catraca = new Catraca($projectRoot);
-        $checkResult = $catraca->check();
-
+        $checkResult = $this->runCatraca($input, $output, $catraca);
         $this->formatResult($input, $output, $checkResult);
 
         return $checkResult->isPass() ? Command::SUCCESS : Command::FAILURE;

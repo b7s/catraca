@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Command;
 
 use B7S\Catraca\Catraca;
@@ -11,14 +13,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 use function sprintf;
 
-#[AsCommand(
-    name: 'init',
-    description: 'Initialize catraca_baseline.json with current metrics',
-)]
-class InitCommand extends Command
+#[AsCommand(name: 'init', description: 'Initialize catraca_baseline.json with current metrics')]
+class InitCommand extends ProjectCommand
 {
-    use CommandHelper;
-
     protected function configure(): void
     {
         $this->addStandardOptions();
@@ -27,18 +24,16 @@ class InitCommand extends Command
     /**
      * @throws JsonException
      */
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $projectRoot = $this->resolveProjectRoot($input, $output);
-        if ($projectRoot === null) {
-            return Command::FAILURE;
-        }
-
-        $catraca = new Catraca($projectRoot);
-        $result = $catraca->init();
-
+    protected function executeForProject(
+        InputInterface $input,
+        OutputInterface $output,
+        string $projectRoot,
+        Catraca $catraca,
+    ): int {
+        $result = $this->runCatraca($input, $output, $catraca, initialize: true);
         $this->formatResult($input, $output, $result);
 
+        $this->saveRunIfEnabled($input, $projectRoot, $result);
         $output->writeln('');
         $output->writeln(sprintf('<info>Baseline written to %s/catraca_baseline.json</info>', $projectRoot));
 

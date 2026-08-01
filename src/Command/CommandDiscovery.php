@@ -20,7 +20,7 @@ class CommandDiscovery
     {
         $commands = [];
 
-        if (! is_dir($directory)) {
+        if (!is_dir($directory)) {
             return $commands;
         }
 
@@ -29,13 +29,13 @@ class CommandDiscovery
                 continue;
             }
 
-            $class = $namespace.'\\'.$file->getBasename('.php');
+            $class = $namespace . '\\' . $file->getBasename('.php');
 
-            if (! class_exists($class)) {
+            if (!class_exists($class)) {
                 continue;
             }
 
-            if (! is_subclass_of($class, Command::class)) {
+            if (!is_subclass_of($class, Command::class)) {
                 continue;
             }
 

@@ -6,6 +6,8 @@
 
 PHP Quality Guardian that enforces the **Catraca (ratchet) principle**: quality metrics can only improve or stay the same, never regress.
 
+_Last reviewed: 2026-08-01._
+
 > **Catraca** (Portuguese for "turnstile" / "ratchet") — like a turnstile at a subway station, quality can only move forward.
 
 ## Install
@@ -18,23 +20,27 @@ composer require b7s/catraca --dev
 
 Gates run in order. A failure blocks the PR.
 
-| # | Gate | Tool                       | Default Threshold |
-|---|------|----------------------------|-------------------|
-| 1 | Security Audit | 15 built-in checks         | 0 critical/high advisories, 0 findings |
-| 2 | Code Style | `pint` or `php-cs-fixer`   | 0 violations |
-| 3 | Static Analysis | `phpstan` or `psalm`       | 0 errors (level 5 if no config) |
-| 4 | Test Coverage | `phpunit` or `pest`        | 85% minimum |
-| 5 | Duplication | `phpcpd`                   | 2% maximum |
-| 6 | File Size | Built-in                   | 1000 lines per file |
-| 7 | Cyclomatic Complexity | `phpmetrics`               | Block at 50, warn at 20 |
-| 8 | Performance | `php-cs-fixer` + Built-in  | 0 violations |
+| # | Gate | Default tool order | Default threshold |
+|---|------|--------------------|-------------------|
+| 1 | Security Audit | Composer audit + built-in checks | 0 critical/high advisories, 0 findings |
+| 2 | Code Style | Mago format -> Pint -> PHP CS Fixer | 0 violations |
+| 3 | Static Analysis | Mago analyze -> PHPStan -> Psalm | 0 errors |
+| 4 | Test Coverage | Pest -> PHPUnit | 85% minimum |
+| 5 | Duplication | PHPCPD | 0% maximum |
+| 6 | File Size | Built-in | 1000 lines per file |
+| 7 | Cyclomatic Complexity | PHP Metrics | Block at 50, warn at 20 |
+| 8 | Performance | Mago lint -> PHP CS Fixer, plus built-in checks | 0 violations |
 
 ## Dependencies
 
-Catraca wraps your existing PHP quality tools. Install the ones you need:
+Catraca wraps your existing PHP quality tools. Install the ones you need. Mago 1.45.0 is the preferred v2 backend:
 
 ```bash
-# Code style
+# Preferred formatter, analyzer, and linter
+composer require --dev carthage-software/mago:1.45.0
+vendor/bin/mago init
+
+# Code style fallbacks
 composer require --dev laravel/pint
 # or
 composer require --dev friendsofphp/php-cs-fixer
@@ -59,7 +65,7 @@ composer require --dev systemsdk/phpcpd:^9.0
 composer require --dev phpmetrics/phpmetrics
 ```
 
-Any tool not installed is **skipped** (not failed). Security audit uses `composer audit` (built-in) and 14 source-code checks.
+With `tool: auto`, Catraca tries the centrally defined fallback order and skips a gate only when none of its candidates is installed. An explicitly selected missing tool is reported without silently switching tools. Security audit uses `composer audit` (built-in) and 14 source-code checks.
 
 ## Usage
 
@@ -78,9 +84,9 @@ Default baseline:
 | Source Dirs | `["src", "app", "lib"]` |
 | Security | 0 advisories, 14 checks all enabled |
 | Code Style | 0 violations |
-| Static Analysis | 0 errors (level 5 if no `phpstan.neon`) |
+| Static Analysis | Current Mago, PHPStan, or Psalm error count captured by `init` |
 | Test Coverage | 85% minimum |
-| Duplication | 2% maximum, min 3 lines, min 30 tokens |
+| Duplication | 0% maximum, min 3 lines, min 30 tokens |
 | File Size | 1000 lines maximum per file |
 | Complexity | Block at CCN 50, warn at CCN 20 |
 | Performance | 0 violations |
@@ -89,78 +95,118 @@ You can edit `catraca_baseline.json` directly to adjust thresholds.
 
 ### Configuration — `catraca_baseline.json`
 
+Configuration and measured results are stored separately:
+
 ```json
 {
-    "source_dirs": {
-        "paths": ["src", "app", "lib"]
-    },
-  "security": {
-    "advisories": 0,
-    "rules": {
-      "hardcoded_secrets": true,
-      "sql_injection": true,
-      "command_injection": true,
-      "csrf_protection": true,
-      "path_traversal": true,
-      "insecure_deserialization": true,
-      "ssrf": true,
-      "tls_verification": true,
-      "insecure_rng": true,
-      "gitignore_sensitive": true,
-      "package_freshness": true,
-      "weak_cryptography": true,
-      "cors_config": true,
-      "npm_audit": true
-    },
-    "fixers": []
-  },
-    "style": {
-        "violations": 0
-    },
-    "static_analysis": {
-        "errors": 0
-    },
-    "coverage": {
-        "percentage": 85.0
-    },
-    "duplication": {
-        "percentage": 2.0,
-        "min_lines": 3,
-        "min_tokens": 30
-    },
-    "file_size": {
-        "max_lines": 1000
-    },
-    "complexity": {
-        "max_ccn": 0
-    },
-    "performance": {
-        "violations": 0,
-        "rules": {
-          "global_namespace_import": true,
-          "no_unused_imports": true,
-          "fully_qualified_strict_types": true,
-          "lambda_not_used_import": true,
-          "native_function_invocation": true,
-          "no_redundant_readonly_property": true,
-          "static_lambda": true,
-          "array_push": true,
-          "ereg_to_preg": true,
-          "modernize_strpos": true,
-          "pow_to_exponentiation": true,
-          "random_api_migration": true,
-          "set_type_to_cast": true,
-          "autoload_optimization": true,
-          "condition_order": true
+    "schema": "catraca/v2",
+    "config": {
+        "source_dirs": {
+            "paths": ["src", "app", "lib"]
         },
-        "fixers": {
-            "condition_order": false
+        "security": {
+            "rules": {
+                "hardcoded_secrets": true,
+                "sql_injection": true,
+                "command_injection": true
+            },
+            "released_days": 3
+        },
+        "duplication": {
+            "min_lines": 3,
+            "min_tokens": 30
+        },
+        "file_size": {
+            "max_lines": 1000
+        },
+        "complexity": {
+            "block_at": 50,
+            "warn_at": 20
+        },
+        "style": {
+            "tool": "auto"
+        },
+        "static_analysis": {
+            "tool": "auto"
+        },
+        "coverage": {
+            "tool": "auto"
+        },
+        "performance": {
+            "tool": "auto"
+        },
+        "mago": {
+            "enabled": true,
+            "format": true,
+            "analyze": true,
+            "lint": true,
+            "version": "1.45.0",
+            "threads": 0,
+            "minimum_report_level": "warning"
+        },
+        "parallel": {
+            "enabled": true,
+            "max_processes": 4
         }
+    },
+    "results": {
+        "style": { "violations": 0 },
+        "static_analysis": { "errors": 0 },
+        "coverage": { "percentage": 85.0 },
+        "duplication": { "percentage": 0.0, "clones": 0 },
+        "file_size": { "over_limit": 0 },
+        "complexity": { "max_ccn": 0, "violations": 0, "warnings": 0 },
+        "performance": { "violations": 0 }
     }
 }
 ```
 
 **`source_dirs.paths`** — which directories Catraca scans for PHP files. Only directories that exist on disk are used. If none of the configured directories exist, the project root is used as fallback. Defaults to `["src", "app", "lib"]`.
+
+**`config` and `results`** — `catraca init` updates only `results`, so thresholds, rule toggles, source paths, and parallel settings are never overwritten by a run. Existing `catraca/v1` files are migrated automatically on the next `init` or `check`.
+
+**`parallel.max_processes`** — maximum number of concurrent gate workers. The default is `4`; `128` is only a safety ceiling, not a machine requirement. Catraca starts at most one worker per gate, and machines with fewer CPU cores remain supported because the operating system schedules those workers. Gate workers do not create nested workers, preventing process fan-out on CI runners.
+
+### Choosing a tool for each validation
+
+For gates with interchangeable backends, set `tool` to `auto` or to one explicit tool. All fallback orders and valid values are defined centrally, so an invalid value fails with a message listing the correct choices.
+
+| Validation | Valid `tool` values | What Catraca runs |
+|------------|---------------------|-------------------|
+| Code Style | `auto`, `mago`, `pint`, `php-cs-fixer` | `mago format --check`, Pint, or PHP CS Fixer |
+| Static Analysis | `auto`, `mago`, `phpstan`, `psalm` | `mago analyze`, PHPStan, or Psalm |
+| Test Coverage | `auto`, `pest`, `phpunit` | Pest or PHPUnit with Clover output |
+| Performance | `auto`, `mago`, `php-cs-fixer` | `mago lint` or PHP CS Fixer, plus built-in autoload and condition-order checks |
+| Security | Not selectable | Composer audit plus built-in source checks |
+| Duplication | Not selectable | PHPCPD |
+| File Size | Not selectable | Built-in scanner |
+| Complexity | Not selectable | PHP Metrics |
+
+`auto` is the v2 default. It selects the first installed tool in the order shown in the Quality Gates table; Mago is preferred for style, static analysis, and performance. An explicit choice does not silently switch to a different external tool if that executable is missing.
+
+```json
+{
+    "config": {
+        "style": { "tool": "mago" },
+        "static_analysis": { "tool": "phpstan" },
+        "coverage": { "tool": "phpunit" },
+        "performance": { "tool": "mago" },
+        "mago": {
+            "enabled": true,
+            "format": true,
+            "analyze": true,
+            "lint": true,
+            "version": "1.45.0",
+            "threads": 0,
+            "minimum_report_level": "warning"
+        }
+    }
+}
+```
+
+`mago.threads: 0` shares Catraca's worker budget automatically. With the default four gate workers, each Mago process uses one thread to avoid CPU oversubscription. Set a positive value up to 128 to override it. `minimum_report_level` accepts `help`, `note`, `warning`, or `error`.
+
+The Mago mappings stay separate: formatter findings update `results.style`, analyzer findings update `results.static_analysis`, and linter findings contribute to `results.performance`. Mago does not replace PHPCPD duplication percentages or PHP Metrics complexity values.
 
 ### `catraca check` — Run quality gates
 
@@ -186,6 +232,8 @@ vendor/bin/catraca check --path=/path/to/project
 # Auto-fix issues if any gate fails, then verify
 vendor/bin/catraca check --fix
 ```
+
+In an interactive terminal, human output is a live Symfony Console table. Queued gates wait for a worker, active gates display an animated spinner, and each row changes immediately to `PASS`, `FAIL`, `WARN`, or `SKIP` with its measured description. Plain, JSON, and GitHub formats remain non-interactive.
 
 > **AI Agent Detection:** When Catraca detects it is running inside an AI agent (Cursor, Claude Code, OpenCode, etc.), it automatically switches to `--format=json` for structured output. You can still override this by explicitly passing `--format`.
 
@@ -234,7 +282,7 @@ Terminal-friendly output with ANSI colors:
   ✔ Code Style              PASS     0 violations (baseline: 0)
   ✘ Static Analysis         FAIL     3 errors (baseline: 0)
   ✔ Test Coverage           PASS     85.00% (baseline: 85.00%)
-  ✘ Duplication             FAIL     5.22% (baseline: 2.00%, 2 clones)
+  ✘ Duplication             FAIL     5.22% (baseline: 0.00%, 2 clones)
   ✔ File Size               PASS     0 files exceed 1000 lines
   ✔ Cyclomatic Complexity   PASS     max CCN 8, 0 violations (>50), 1 warnings (>20)
   ✔ Performance             PASS     No performance improvements needed
@@ -248,7 +296,7 @@ Terminal-friendly output with ANSI colors:
       → app/Service.php:42
       → app/Repository.php:15
       → app/Controller.php:88
-  [2] REFACTOR DUP — Duplication increased from 2.00% to 5.20%
+  [2] REFACTOR DUP — Duplication increased from 0.00% to 5.20%
       → src/A.php:10-50 <-> src/B.php:100-140 (40L)
 ```
 
@@ -261,7 +309,7 @@ Catraca auto-detects AI agents (Cursor, Claude Code, OpenCode, Gemini CLI, Codex
 
 ```json
 {
-  "schema": "catraca/v1",
+  "schema": "catraca/v2",
   "result": "fail",
   "timestamp": "2025-05-08T10:30:00+00:00",
   "summary": {
@@ -565,3 +613,89 @@ Each tool is resolved in this order:
 ## License
 
 MIT
+
+## Advanced workflows
+
+### Ratchet policies
+
+Every gate accepts a `mode` under `config.<gate>`:
+
+- `no_regression` (default) compares the primary metric with the stored result.
+- `absolute` uses the gate's fixed threshold.
+- `informational` reports findings as warnings without blocking.
+
+Unavailable dependencies and metrics are controlled centrally:
+
+```json
+{
+    "config": {
+        "policy": {
+            "missing_tool": "skip",
+            "unavailable_metric": "warn",
+            "internal_error": "fail"
+        },
+        "process": {
+            "timeout_seconds": 1200
+        }
+    }
+}
+```
+
+Each policy accepts `fail`, `warn`, or `skip`. A gate can override the process timeout with `config.<gate>.timeout_seconds`.
+
+### Source scope and pull requests
+
+Source paths support directories and globs. Exclusions apply to every built-in source scanner:
+
+```json
+{
+    "config": {
+        "source_dirs": {
+            "paths": ["src", "packages/*/src"],
+            "exclude": ["vendor", ".git", "node_modules", "generated"]
+        }
+    }
+}
+```
+
+For fast pull-request feedback, analyze the PHP files changed from a Git reference:
+
+```bash
+vendor/bin/catraca check --changed-from=origin/main
+```
+
+Run the complete check on the main branch or scheduled CI build.
+
+### Profiles
+
+Named profiles keep measured results isolated while inheriting the default configuration:
+
+```bash
+vendor/bin/catraca init --profile=api
+vendor/bin/catraca check --profile=api
+```
+
+Profile overrides live under `profiles.<name>.config`; their metrics live under `profiles.<name>.results`.
+
+### CI artifacts and history
+
+```bash
+vendor/bin/catraca check --format=sarif --output=catraca.sarif
+vendor/bin/catraca check --format=junit --output=catraca.xml
+vendor/bin/catraca check --format=json-pretty --output=catraca.json
+vendor/bin/catraca check --save-run
+```
+
+Saved runs are separate from the baseline under `.catraca/runs`. Enable this permanently with `config.history.enabled` and control cleanup with `config.history.retention`.
+
+### Diagnostics
+
+```bash
+vendor/bin/catraca doctor
+vendor/bin/catraca config:validate
+vendor/bin/catraca explain coverage
+```
+
+`doctor` reports tool availability, coverage drivers, parallel fallback, and resolved source paths. `explain` shows the effective mode, policies, configuration, and stored baseline for one gate.
+
+Pressing Ctrl+C or receiving SIGTERM stops active workers, marks unfinished live-table rows as `CANCELLED`, and returns a failing exit code.

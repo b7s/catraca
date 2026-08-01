@@ -30,10 +30,11 @@ class GithubFormatter
                 Status::Fail => '✘',
                 Status::Warn => '⚠',
                 Status::Skip => '—',
+                Status::Cancelled => '�',
             };
 
             $annotationLevel = match ($gate->status) {
-                Status::Fail => 'error',
+                Status::Fail, Status::Cancelled => 'error',
                 Status::Warn => 'warning',
                 default => 'notice',
             };
@@ -51,7 +52,12 @@ class GithubFormatter
 
         $lines[] = '';
         $overall = $result->isPass() ? 'PASS' : 'FAIL';
-        $lines[] = sprintf('Result: %s (%d/%d gates passed)', $overall, $result->getPassedCount(), count($result->getGates()));
+        $lines[] = sprintf(
+            'Result: %s (%d/%d gates passed)',
+            $overall,
+            $result->getPassedCount(),
+            count($result->getGates()),
+        );
 
         $actions = $result->getActions();
         if (count($actions) > 0) {
@@ -65,11 +71,11 @@ class GithubFormatter
 
         $lines[] = '::endgroup::';
 
-        if (! $result->isPass()) {
+        if (!$result->isPass()) {
             $lines[] = sprintf('::error::Catraca: %d quality gate(s) failed', $result->getFailedCount());
         }
 
-        return implode("\n", $lines)."\n";
+        return implode("\n", $lines) . "\n";
     }
 
     /**
@@ -78,16 +84,16 @@ class GithubFormatter
     private function annotateDetails(array &$lines, GateResult $gate, string $annotationLevel): void
     {
         $errors = $gate->details['errors'] ?? $gate->details['clones'] ?? $gate->details['oversized'] ?? [];
-        if (! is_array($errors)) {
+        if (!is_array($errors)) {
             return;
         }
         foreach (array_slice($errors, 0, 10) as $detail) {
-            if (! is_array($detail)) {
+            if (!is_array($detail)) {
                 continue;
             }
             $file = $detail['file'] ?? null;
             $line = $detail['line'] ?? 0;
-            $message = $detail['message'] ?? ($detail['file'] ?? '');
+            $message = $detail['message'] ?? $detail['file'] ?? '';
             if (is_string($file) && is_int($line) && is_string($message)) {
                 $lines[] = sprintf('::%s file=%s,line=%d::%s', $annotationLevel, $file, $line, $message);
             }

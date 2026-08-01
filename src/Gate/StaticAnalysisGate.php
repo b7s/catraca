@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
@@ -8,6 +10,9 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\GateToolRegistry;
+use B7S\Catraca\MagoRunner;
+use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
@@ -18,42 +23,61 @@ use function is_int;
 use function is_string;
 use function sprintf;
 
-class StaticAnalysisGate implements GateInterface
+readonly class StaticAnalysisGate implements GateInterface
 {
+    public function __construct(
+        private SourcePathResolver $pathResolver = new SourcePathResolver(),
+        private MagoRunner $magoRunner = new MagoRunner(),
+    ) {}
+
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $phpstan = $resolver->resolve('phpstan');
-        if ($phpstan !== null) {
-            return $this->runPhpstan($phpstan, $baseline, $resolver);
-        }
-
-        $psalm = $resolver->resolve('psalm');
-        if ($psalm !== null) {
-            return $this->runPsalm($psalm, $baseline, $resolver);
+        $tool = GateToolRegistry::resolve($baseline, $resolver, 'static_analysis');
+        if ($tool !== null) {
+            return match ($tool->name) {
+                'mago' => $this->runMago($tool->path, $baseline),
+                'phpstan' => $this->runPhpstan($tool->path, $baseline, $resolver),
+                default => $this->runPsalm($tool->path, $baseline, $resolver),
+            };
         }
 
         return new GateResult(
             status: Status::Skip,
             name: 'static_analysis',
             label: 'Static Analysis',
-            message: 'No static analysis tool found (install phpstan or psalm)',
+            message: 'No static analysis tool found (install mago 1.45.0, phpstan, or psalm)',
             severity: Severity::Warn,
         );
+    }
+
+    private function runMago(string $mago, Baseline $baseline): GateResult
+    {
+        $result = $this->magoRunner->diagnostics(
+            $mago,
+            'analyze',
+            $this->pathResolver->resolveForBaseline($baseline),
+            $baseline,
+        );
+
+        return $this->buildResult($result->issueCount(), $result->issues, $result->files(), $baseline, 'Mago');
     }
 
     private function runPhpstan(string $phpstan, Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $args = [
-            $resolver->resolvePhp(), $phpstan,
-            'analyse', '--memory-limit=512M',
-            '--error-format=json', '--no-progress',
+            $resolver->resolvePhp(),
+            $phpstan,
+            'analyse',
+            '--memory-limit=512M',
+            '--error-format=json',
+            '--no-progress',
         ];
 
-        if (! $this->hasPhpstanConfig($baseline->projectRoot)) {
+        if (!$this->hasPhpstanConfig($baseline->projectRoot)) {
             $args[] = '--level=5';
         }
 
-        $process = new Process($args);
+        $process = new Process($args, timeout: $baseline->getGateTimeout('static_analysis'));
         $process->setWorkingDirectory($baseline->projectRoot);
         $process->run();
 
@@ -79,15 +103,15 @@ class StaticAnalysisGate implements GateInterface
             $rawFiles = $data['files'] ?? [];
             if (is_array($rawFiles)) {
                 foreach ($rawFiles as $filePath => $fileData) {
-                    if (! is_string($filePath) || ! is_array($fileData)) {
+                    if (!is_string($filePath) || !is_array($fileData)) {
                         continue;
                     }
                     $messages = $fileData['messages'] ?? [];
-                    if (! is_array($messages)) {
+                    if (!is_array($messages)) {
                         continue;
                     }
                     foreach ($messages as $msg) {
-                        if (! is_array($msg)) {
+                        if (!is_array($msg)) {
                             continue;
                         }
                         $errors[] = [
@@ -96,7 +120,7 @@ class StaticAnalysisGate implements GateInterface
                             'message' => is_string($msg['message'] ?? null) ? $msg['message'] : '',
                             'ignorable' => ($msg['ignorable'] ?? true) === true,
                         ];
-                        $files[] = $filePath.':'.(is_int($msg['line'] ?? null) ? $msg['line'] : 0);
+                        $files[] = $filePath . ':' . (is_int($msg['line'] ?? null) ? $msg['line'] : 0);
                     }
                 }
             }
@@ -110,9 +134,11 @@ class StaticAnalysisGate implements GateInterface
     private function runPsalm(string $psalm, Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $process = new Process([
-            $resolver->resolvePhp(), $psalm,
-            '--output-format=json', '--no-progress',
-        ]);
+            $resolver->resolvePhp(),
+            $psalm,
+            '--output-format=json',
+            '--no-progress',
+        ], timeout: $baseline->getGateTimeout('static_analysis'));
         $process->run();
 
         $output = $process->getOutput() !== '' ? $process->getOutput() : $process->getErrorOutput();
@@ -125,7 +151,7 @@ class StaticAnalysisGate implements GateInterface
 
         if (is_array($data)) {
             foreach ($data as $issue) {
-                if (! is_array($issue)) {
+                if (!is_array($issue)) {
                     continue;
                 }
                 $filePath = $issue['file_path'] ?? null;
@@ -137,7 +163,7 @@ class StaticAnalysisGate implements GateInterface
                         'message' => is_string($issue['message'] ?? null) ? $issue['message'] : '',
                         'severity' => is_string($issue['severity'] ?? null) ? $issue['severity'] : 'error',
                     ];
-                    $files[] = $filePath.':'.$line;
+                    $files[] = $filePath . ':' . $line;
                 }
             }
         }
@@ -149,10 +175,15 @@ class StaticAnalysisGate implements GateInterface
      * @param  array<int, array<string, mixed>>  $errors
      * @param  array<int, string>  $files
      */
-    private function buildResult(int $errorCount, array $errors, array $files, Baseline $baseline, string $toolName): GateResult
-    {
-        $baselineErrors = is_int($baseline->get('static_analysis', 'errors', 0))
-            ? $baseline->get('static_analysis', 'errors', 0)
+    private function buildResult(
+        int $errorCount,
+        array $errors,
+        array $files,
+        Baseline $baseline,
+        string $toolName,
+    ): GateResult {
+        $baselineErrors = is_int($baseline->getResult('static_analysis', 'errors', 0))
+            ? $baseline->getResult('static_analysis', 'errors', 0)
             : 0;
 
         $status = Status::Pass;
@@ -171,7 +202,7 @@ class StaticAnalysisGate implements GateInterface
             status: $status,
             name: 'static_analysis',
             label: 'Static Analysis',
-            message: sprintf('%d errors (baseline: %d)', $errorCount, $baselineErrors),
+            message: sprintf('%d errors (baseline: %d) via %s', $errorCount, $baselineErrors, $toolName),
             severity: Severity::Block,
             baseline: ['errors' => $baselineErrors],
             current: ['errors' => $errorCount],
@@ -183,7 +214,7 @@ class StaticAnalysisGate implements GateInterface
     private function hasPhpstanConfig(string $projectRoot): bool
     {
         foreach (['phpstan.neon', 'phpstan.neon.dist', 'phpstan.dist.neon'] as $file) {
-            if (file_exists($projectRoot.'/'.$file)) {
+            if (file_exists($projectRoot . '/' . $file)) {
                 return true;
             }
         }

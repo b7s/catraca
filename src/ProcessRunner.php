@@ -1,18 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca;
 
 use Symfony\Component\Process\Process;
 
 class ProcessRunner
 {
+    public function __construct(
+        private ?float $timeout = 1200.0,
+    ) {}
+
     /**
      * @param  array<int, string>  $command
      * @return array{success: bool, output: string, errorOutput: string}
      */
     public function run(array $command): array
     {
-        $process = new Process($command);
+        $process = new Process($command, timeout: $this->timeout);
         $process->run();
 
         return [

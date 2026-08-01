@@ -70,7 +70,10 @@ class SecuritySubCheck
         '/GOCSPX-[A-Za-z0-9_-]{20,}/',
         '/ya29\.[A-Za-z0-9_-]+/',
         '/WH-[0-9A-Z][A-Za-z0-9-]{10,}/',
-        '/access_token\\\$production\\\$/', '/access_token\\\$sandbox\\\$/', '/access_token\$production\$/', '/access_token\$sandbox\$/',
+        '/access_token\\\$production\\\$/',
+        '/access_token\\\$sandbox\\\$/',
+        '/access_token\$production\$/',
+        '/access_token\$sandbox\$/',
         '/sk-[A-Za-z0-9]+T3BlbkFJ[A-Za-z0-9]+/',
         '/\bsk-[A-Za-z0-9]{45,}\b/',
         '/sk-proj-[A-Za-z0-9_-]{20,}/',
@@ -127,7 +130,12 @@ class SecuritySubCheck
     ];
 
     private const array DANGEROUS_EXEC_FUNCTIONS = [
-        'exec', 'shell_exec', 'system', 'passthru', 'proc_open', 'popen',
+        'exec',
+        'shell_exec',
+        'system',
+        'passthru',
+        'proc_open',
+        'popen',
     ];
 
     private const array GITIGNORE_REQUIRED_PATTERNS = [
@@ -170,7 +178,7 @@ class SecuritySubCheck
                 }
 
                 foreach (self::HARD_CODED_SECRET_PATTERNS as $pattern) {
-                    if (! preg_match($pattern, $line)) {
+                    if (!preg_match($pattern, $line)) {
                         continue;
                     }
 
@@ -182,16 +190,22 @@ class SecuritySubCheck
                         }
                     }
 
-                    if (! $isSafe && preg_match('/[\'"]password[\'"]\s*=>\s*[\'"]hashed[\'"]/i', $line)) {
+                    if (!$isSafe && preg_match('/[\'"]password[\'"]\s*=>\s*[\'"]hashed[\'"]/i', $line)) {
                         $isSafe = true;
                     }
 
-                    if (! $isSafe && preg_match('/=>\s*["\'](?:required|nullable|sometimes|present|prohibited|accepted|email|string|integer|numeric|uuid|url|json|file|image|confirmed|min:|max:|regex:|in:|not_in:|unique:|exists:)[^"\']*["\']/i', $line)) {
+                    if (
+                        !$isSafe
+                        && preg_match(
+                            '/=>\s*["\'](?:required|nullable|sometimes|present|prohibited|accepted|email|string|integer|numeric|uuid|url|json|file|image|confirmed|min:|max:|regex:|in:|not_in:|unique:|exists:)[^"\']*["\']/i',
+                            $line,
+                        )
+                    ) {
                         $isSafe = true;
                     }
 
-                    if (! $isSafe) {
-                        $findings[] = "{$relative}:".($i + 1).' — '.mb_strimwidth($trimmed, 0, 120, '…');
+                    if (!$isSafe) {
+                        $findings[] = "{$relative}:" . ($i + 1) . ' — ' . mb_strimwidth($trimmed, 0, 120, '…');
                         break;
                     }
                 }
@@ -221,10 +235,10 @@ class SecuritySubCheck
     {
         $findings = [];
         $fnPattern = implode('|', self::DANGEROUS_EXEC_FUNCTIONS);
-        $pattern = '/\b(?:'.$fnPattern.')\s*\([^)]*\$(?!this)[a-zA-Z_]/';
+        $pattern = '/\b(?:' . $fnPattern . ')\s*\([^)]*\$(?!this)[a-zA-Z_]/';
 
         foreach ($this->scanLines($this->paths, self::EXCLUDE_PATHS) as [$pathname, $i, $line]) {
-            if (! preg_match($pattern, $line)) {
+            if (!preg_match($pattern, $line)) {
                 continue;
             }
             if (preg_match('/escapeshellarg|escapeshellcmd/', $line)) {
@@ -238,8 +252,8 @@ class SecuritySubCheck
 
     public function checkCsrf(): array
     {
-        $viewsPath = $this->root.'/resources/views';
-        if (! is_dir($viewsPath)) {
+        $viewsPath = $this->root . '/resources/views';
+        if (!is_dir($viewsPath)) {
             return [];
         }
 
@@ -256,25 +270,29 @@ class SecuritySubCheck
             if (preg_match_all('/<form\b[^>]*method=["\'](?:POST|PUT|PATCH|DELETE)["\'][^>]*>/i', $content, $matches)) {
                 $httpForms = array_filter(
                     $matches[0],
-                    static fn (string $formTag): bool => ! preg_match('/\bwire:submit\b/i', $formTag),
+                    static fn(string $formTag): bool => !preg_match('/\bwire:submit\b/i', $formTag),
                 );
 
                 if ($httpForms === []) {
                     continue;
                 }
 
-                $hasCsrf = str_contains($content, '@csrf')
+                $hasCsrf =
+                    str_contains($content, '@csrf')
                     || str_contains($content, 'csrf_field()')
                     || str_contains($content, 'csrf_token()');
 
-                if (! $hasCsrf) {
-                    $findings[] = "{$relative}: ".count($httpForms).' form(s) with POST/PUT/PATCH/DELETE but no @csrf directive.';
+                if (!$hasCsrf) {
+                    $findings[] =
+                        "{$relative}: "
+                        . count($httpForms)
+                        . ' form(s) with POST/PUT/PATCH/DELETE but no @csrf directive.';
                 }
             }
         }
 
-        $kernelPath = $this->root.'/app/Http/Kernel.php';
-        $bootstrapPath = $this->root.'/bootstrap/app.php';
+        $kernelPath = $this->root . '/app/Http/Kernel.php';
+        $bootstrapPath = $this->root . '/bootstrap/app.php';
         $middlewareSourceExists = file_exists($kernelPath) || file_exists($bootstrapPath);
 
         if ($middlewareSourceExists) {
@@ -283,21 +301,23 @@ class SecuritySubCheck
 
             if (file_exists($kernelPath)) {
                 $kernelContent = (string) file_get_contents($kernelPath);
-                $kernelHasCsrf = str_contains($kernelContent, 'VerifyCsrfToken')
+                $kernelHasCsrf =
+                    str_contains($kernelContent, 'VerifyCsrfToken')
                     || str_contains($kernelContent, 'PreventRequestForgery');
             }
 
             $bootstrapContent = file_exists($bootstrapPath) ? (string) file_get_contents($bootstrapPath) : '';
             if ($bootstrapContent !== '') {
-                $bootstrapHasCsrf = str_contains($bootstrapContent, 'VerifyCsrfToken')
+                $bootstrapHasCsrf =
+                    str_contains($bootstrapContent, 'VerifyCsrfToken')
                     || str_contains($bootstrapContent, 'PreventRequestForgery');
             }
 
-            $onlyBootstrap = ! file_exists($kernelPath) && file_exists($bootstrapPath);
+            $onlyBootstrap = !file_exists($kernelPath) && file_exists($bootstrapPath);
             $csrfRemoved = $onlyBootstrap && $this->csrfMiddlewareRemovedFromWebInBootstrap($bootstrapContent);
-            $csrfPresent = $kernelHasCsrf || $bootstrapHasCsrf || ! $csrfRemoved;
+            $csrfPresent = $kernelHasCsrf || $bootstrapHasCsrf || !$csrfRemoved;
 
-            if (! $csrfPresent) {
+            if (!$csrfPresent) {
                 $findings[] = 'CSRF middleware (VerifyCsrfToken / PreventRequestForgery) not found in Kernel/bootstrap — check that CSRF is not disabled globally.';
             }
         }
@@ -315,26 +335,46 @@ class SecuritySubCheck
                 continue;
             }
 
-            if (preg_match('/Storage::(?:disk\([^)]*\)->)?(?:get|put|putFileAs|move|copy|delete|download|readStream|writeStream)\s*\(\s*\$(?:'.$userInput.')\b/', $line)) {
+            if (preg_match(
+                '/Storage::(?:disk\([^)]*\)->)?(?:get|put|putFileAs|move|copy|delete|download|readStream|writeStream)\s*\(\s*\$(?:'
+                . $userInput
+                . ')\b/',
+                $line,
+            )) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'Storage:: with user-controlled path');
 
                 continue;
             }
 
-            if (preg_match('/\b(file_get_contents|fopen|readfile|file_put_contents)\s*\(\s*\$(?:'.$userInput.')\b/', $line, $m)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, $m[1].'() with user-controlled path');
+            if (preg_match(
+                '/\b(file_get_contents|fopen|readfile|file_put_contents)\s*\(\s*\$(?:' . $userInput . ')\b/',
+                $line,
+                $m,
+            )) {
+                $findings[] = $this->fmt($this->root, $pathname, $i, $line, $m[1] . '() with user-controlled path');
 
                 continue;
             }
 
-            if (preg_match('/\b(include|include_once|require|require_once)\s+\$(?:'.$userInput.')\b/', $line, $m)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, $m[1].' with user-controlled path');
+            if (preg_match('/\b(include|include_once|require|require_once)\s+\$(?:' . $userInput . ')\b/', $line, $m)) {
+                $findings[] = $this->fmt($this->root, $pathname, $i, $line, $m[1] . ' with user-controlled path');
 
                 continue;
             }
 
-            if (preg_match('/(?:file_get_contents|fopen|readfile|file_put_contents|Storage::|include|require)\b[^;]*[\'"]\w+[\'"]\s*\.\s*\$(?:'.$userInput.')\b/', $line)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'File operation with concatenated user input');
+            if (preg_match(
+                '/(?:file_get_contents|fopen|readfile|file_put_contents|Storage::|include|require)\b[^;]*[\'"]\w+[\'"]\s*\.\s*\$(?:'
+                . $userInput
+                . ')\b/',
+                $line,
+            )) {
+                $findings[] = $this->fmt(
+                    $this->root,
+                    $pathname,
+                    $i,
+                    $line,
+                    'File operation with concatenated user input',
+                );
             }
         }
 
@@ -353,8 +393,16 @@ class SecuritySubCheck
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'unserialize() with dynamic input');
             }
 
-            if (preg_match('/unserialize\s*\(\s*base64_decode/', $line) && ! $this->isInsideString($line, 'unserialize')) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'unserialize(base64_decode(...)) — exploit chain');
+            if (
+                preg_match('/unserialize\s*\(\s*base64_decode/', $line) && !$this->isInsideString($line, 'unserialize')
+            ) {
+                $findings[] = $this->fmt(
+                    $this->root,
+                    $pathname,
+                    $i,
+                    $line,
+                    'unserialize(base64_decode(...)) — exploit chain',
+                );
             }
         }
 
@@ -367,29 +415,58 @@ class SecuritySubCheck
         $userInput = self::USER_INPUT_SOURCES;
 
         foreach ($this->scanLines($this->paths, self::EXCLUDE_PATHS_WITH_TESTS) as [$pathname, $i, $line]) {
-            if (preg_match('/\bHttp::(?:get|post|put|patch|delete|head|send)\s*\(\s*\$(?:'.$userInput.')\b/', $line)) {
+            if (preg_match(
+                '/\bHttp::(?:get|post|put|patch|delete|head|send)\s*\(\s*\$(?:' . $userInput . ')\b/',
+                $line,
+            )) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'Http:: called with user-controlled URL');
 
                 continue;
             }
 
-            if (preg_match('/->(?:request|get|post|put|patch|delete|head|send)\s*\(\s*(?:["\'][A-Z]+["\']\s*,\s*)?\$(?:'.$userInput.')\b/', $line)) {
+            if (preg_match(
+                '/->(?:request|get|post|put|patch|delete|head|send)\s*\(\s*(?:["\'][A-Z]+["\']\s*,\s*)?\$(?:'
+                . $userInput
+                . ')\b/',
+                $line,
+            )) {
                 $content = file_get_contents($pathname);
-                if ($content !== false && (str_contains($content, 'GuzzleHttp') || preg_match('/Guzzle|GuzzleHttp|HttpClient|Client/', $line))) {
-                    $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'HTTP client called with user-controlled URL');
+                if (
+                    $content !== false
+                    && (
+                        str_contains($content, 'GuzzleHttp')
+                        || preg_match('/Guzzle|GuzzleHttp|HttpClient|Client/', $line)
+                    )
+                ) {
+                    $findings[] = $this->fmt(
+                        $this->root,
+                        $pathname,
+                        $i,
+                        $line,
+                        'HTTP client called with user-controlled URL',
+                    );
 
                     continue;
                 }
             }
 
-            if (preg_match('/\b(?:file_get_contents|fopen|get_headers|readfile)\s*\(\s*\$(?:'.$userInput.')\b/', $line)) {
+            if (preg_match(
+                '/\b(?:file_get_contents|fopen|get_headers|readfile)\s*\(\s*\$(?:' . $userInput . ')\b/',
+                $line,
+            )) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'Remote call with user-controlled URL');
 
                 continue;
             }
 
-            if (preg_match('/curl_setopt\s*\([^,]+,\s*CURLOPT_URL\s*,\s*\$(?:'.$userInput.')\b/', $line)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'curl_setopt(CURLOPT_URL) with user-controlled URL');
+            if (preg_match('/curl_setopt\s*\([^,]+,\s*CURLOPT_URL\s*,\s*\$(?:' . $userInput . ')\b/', $line)) {
+                $findings[] = $this->fmt(
+                    $this->root,
+                    $pathname,
+                    $i,
+                    $line,
+                    'curl_setopt(CURLOPT_URL) with user-controlled URL',
+                );
             }
         }
 
@@ -401,7 +478,9 @@ class SecuritySubCheck
         $findings = [];
 
         foreach ($this->scanLines($this->paths, self::EXCLUDE_PATHS_WITH_TESTS) as [$pathname, $i, $line]) {
-            if (preg_match('/->withoutVerifying\s*\(/', $line) || preg_match('/\bHttp::withoutVerifying\s*\(/', $line)) {
+            if (
+                preg_match('/->withoutVerifying\s*\(/', $line) || preg_match('/\bHttp::withoutVerifying\s*\(/', $line)
+            ) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'withoutVerifying() disables TLS');
 
                 continue;
@@ -438,9 +517,17 @@ class SecuritySubCheck
         $findings = [];
 
         foreach ($this->scanLines($this->paths, self::EXCLUDE_PATHS_WITH_TESTS) as [$pathname, $i, $line]) {
-            if (preg_match('/\b(rand|mt_rand|uniqid)\s*\(/', $line, $m)
-                && preg_match('/'.self::INSECURE_RNG_SECURITY_KEYWORDS.'/i', $line)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, $m[1].'() used for a secret/token (use random_bytes)');
+            if (
+                preg_match('/\b(rand|mt_rand|uniqid)\s*\(/', $line, $m)
+                && preg_match('/' . self::INSECURE_RNG_SECURITY_KEYWORDS . '/i', $line)
+            ) {
+                $findings[] = $this->fmt(
+                    $this->root,
+                    $pathname,
+                    $i,
+                    $line,
+                    $m[1] . '() used for a secret/token (use random_bytes)',
+                );
             }
         }
 
@@ -449,8 +536,8 @@ class SecuritySubCheck
 
     public function checkGitignore(): array
     {
-        $gitignorePath = $this->root.'/.gitignore';
-        if (! file_exists($gitignorePath)) {
+        $gitignorePath = $this->root . '/.gitignore';
+        if (!file_exists($gitignorePath)) {
             return ['.gitignore not found — sensitive files may be committed'];
         }
 
@@ -462,16 +549,16 @@ class SecuritySubCheck
                 continue;
             }
 
-            if (! $this->sensitiveFileExists($pattern)) {
+            if (!$this->sensitiveFileExists($pattern)) {
                 continue;
             }
 
             $findings[] = "\"{$pattern}\" is not listed in .gitignore";
         }
 
-        $envPath = $this->root.'/.env';
+        $envPath = $this->root . '/.env';
         if (file_exists($envPath)) {
-            exec('git -C '.escapeshellarg($this->root).' ls-files --error-unmatch .env 2>/dev/null', $out, $code);
+            exec('git -C ' . escapeshellarg($this->root) . ' ls-files --error-unmatch .env 2>/dev/null', $out, $code);
             if ($code === 0) {
                 $findings[] = '.env is actively tracked by git — remove with `git rm --cached .env`';
             }
@@ -482,13 +569,13 @@ class SecuritySubCheck
 
     public function checkPackageFreshness(int $minimumAgeDays = 3): array
     {
-        $lockPath = $this->root.'/composer.lock';
-        if (! file_exists($lockPath)) {
+        $lockPath = $this->root . '/composer.lock';
+        if (!file_exists($lockPath)) {
             return [];
         }
 
         $lock = @json_decode((string) file_get_contents($lockPath), true);
-        if (! is_array($lock)) {
+        if (!is_array($lock)) {
             return [];
         }
 
@@ -531,19 +618,30 @@ class SecuritySubCheck
             }
 
             if (preg_match('/openssl_(?:encrypt|decrypt)\s*\([^)]*[\'"][^"\']*-ecb[\'"]/i', $line)) {
-                $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'ECB cipher mode is insecure (use CBC/GCM)');
+                $findings[] = $this->fmt(
+                    $this->root,
+                    $pathname,
+                    $i,
+                    $line,
+                    'ECB cipher mode is insecure (use CBC/GCM)',
+                );
 
                 continue;
             }
 
-            if (preg_match('/[\'"](?:des|3des|rc4|rc2)(?:-[a-z0-9]+)?[\'"]/i', $line) && preg_match('/openssl_(?:encrypt|decrypt)/', $line)) {
+            if (
+                preg_match('/[\'"](?:des|3des|rc4|rc2)(?:-[a-z0-9]+)?[\'"]/i', $line)
+                && preg_match('/openssl_(?:encrypt|decrypt)/', $line)
+            ) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, 'DES/3DES/RC4 cipher is broken');
 
                 continue;
             }
 
-            if (preg_match('/\b(md5|sha1)\s*\(/i', $line, $m)
-                && preg_match('/'.self::WEAK_CRYPTO_SECURITY_KEYWORDS.'/i', $line)) {
+            if (
+                preg_match('/\b(md5|sha1)\s*\(/i', $line, $m)
+                && preg_match('/' . self::WEAK_CRYPTO_SECURITY_KEYWORDS . '/i', $line)
+            ) {
                 $findings[] = $this->fmt($this->root, $pathname, $i, $line, "weak hash {$m[1]}() in security context");
             }
         }
@@ -553,8 +651,8 @@ class SecuritySubCheck
 
     public function checkCorsConfig(): array
     {
-        $configPath = $this->root.'/config/cors.php';
-        if (! file_exists($configPath)) {
+        $configPath = $this->root . '/config/cors.php';
+        if (!file_exists($configPath)) {
             return [];
         }
 
@@ -562,7 +660,8 @@ class SecuritySubCheck
         $findings = [];
 
         $allowsAllOrigins = preg_match("/'allowed_origins'\s*=>\s*\[\s*['\"]\\*['\"]\s*\]/", $content) === 1;
-        $allowsAllOriginsPatterns = preg_match("/'allowed_origins_patterns'\s*=>\s*\[\s*['\"]\\.\\*['\"]\s*\]/", $content) === 1;
+        $allowsAllOriginsPatterns =
+            preg_match("/'allowed_origins_patterns'\s*=>\s*\[\s*['\"]\\.\\*['\"]\s*\]/", $content) === 1;
         $supportsCredentials = preg_match("/'supports_credentials'\s*=>\s*true/", $content) === 1;
         $allowsAllHeaders = preg_match("/'allowed_headers'\s*=>\s*\[\s*['\"]\\*['\"]\s*\]/", $content) === 1;
         $allowsAllMethods = preg_match("/'allowed_methods'\s*=>\s*\[\s*['\"]\\*['\"]\s*\]/", $content) === 1;
@@ -593,13 +692,13 @@ class SecuritySubCheck
      */
     public function runComposerAudit(string $composerBin): array
     {
-        $process = new Process([$composerBin, 'audit', '--format=json']);
+        $process = new Process([$composerBin, 'audit', '--format=json'], timeout: 120);
         $process->setWorkingDirectory($this->root);
         $process->run();
 
         $output = $process->getOutput();
         $data = json_decode($output, true);
-        if (! is_array($data)) {
+        if (!is_array($data)) {
             return ['findings' => [], 'critical' => 0];
         }
 
@@ -607,7 +706,7 @@ class SecuritySubCheck
         $advisories = is_array($rawAdvisories) ? $rawAdvisories : [];
 
         $critical = array_filter($advisories, static function (mixed $a): bool {
-            if (! is_array($a)) {
+            if (!is_array($a)) {
                 return false;
             }
             $severity = $a['severity'] ?? '';
@@ -619,7 +718,7 @@ class SecuritySubCheck
         $findings = [];
 
         foreach ($critical as $a) {
-            if (! is_array($a)) {
+            if (!is_array($a)) {
                 continue;
             }
             $title = is_string($a['title'] ?? null) ? $a['title'] : 'unknown';
@@ -632,21 +731,22 @@ class SecuritySubCheck
 
     public function checkNpmAudit(): array
     {
-        if (! file_exists($this->root.'/package.json')) {
+        if (!file_exists($this->root . '/package.json')) {
             return [];
         }
 
-        $hasLock = file_exists($this->root.'/package-lock.json')
-            || file_exists($this->root.'/yarn.lock')
-            || file_exists($this->root.'/pnpm-lock.yaml');
+        $hasLock =
+            file_exists($this->root . '/package-lock.json')
+            || file_exists($this->root . '/yarn.lock')
+            || file_exists($this->root . '/pnpm-lock.yaml');
 
-        if (! $hasLock) {
+        if (!$hasLock) {
             return [];
         }
 
         $whichNpm = new Process(['which', 'npm']);
         $whichNpm->run();
-        if (! $whichNpm->isSuccessful()) {
+        if (!$whichNpm->isSuccessful()) {
             return [];
         }
 
@@ -655,13 +755,13 @@ class SecuritySubCheck
 
         $output = @json_decode($process->getOutput(), true) ?? [];
         $vulnerabilities = $output['vulnerabilities'] ?? [];
-        if (! is_array($vulnerabilities)) {
+        if (!is_array($vulnerabilities)) {
             return [];
         }
 
         $findings = [];
         foreach ($vulnerabilities as $name => $vuln) {
-            if (! is_array($vuln)) {
+            if (!is_array($vuln)) {
                 continue;
             }
             $severity = $vuln['severity'] ?? 'unknown';
@@ -686,10 +786,10 @@ class SecuritySubCheck
     private function sensitiveFileExists(string $pattern): bool
     {
         if (str_starts_with($pattern, '*')) {
-            return glob($this->root.'/'.$pattern) !== [];
+            return glob($this->root . '/' . $pattern) !== [];
         }
 
-        return file_exists($this->root.'/'.$pattern);
+        return file_exists($this->root . '/' . $pattern);
     }
 
     private function isInsideString(string $line, string $keyword): bool
@@ -703,12 +803,12 @@ class SecuritySubCheck
         $singleQuotes = mb_substr_count($before, "'");
         $doubleQuotes = mb_substr_count($before, '"');
 
-        return ($singleQuotes % 2 !== 0) || ($doubleQuotes % 2 !== 0);
+        return ($singleQuotes % 2) !== 0 || ($doubleQuotes % 2) !== 0;
     }
 
     private function csrfMiddlewareRemovedFromWebInBootstrap(string $bootstrap): bool
     {
-        if (! preg_match('/->web\s*\(\s*remove:\s*\[/s', $bootstrap, $m, PREG_OFFSET_CAPTURE)) {
+        if (!preg_match('/->web\s*\(\s*remove:\s*\[/s', $bootstrap, $m, PREG_OFFSET_CAPTURE)) {
             return false;
         }
 

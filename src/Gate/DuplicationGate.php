@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
@@ -8,6 +10,7 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Symfony\Component\Process\Process;
 
@@ -19,6 +22,12 @@ use function strlen;
 
 class DuplicationGate implements GateInterface
 {
+    private const float DUPLICATION_PERCENT = 0.0;
+
+    private const int DUPLICATION_MIN_LINE = 0;
+
+    private const int DUPLICATION_MIN_TOKENS = 30;
+
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $phpcpd = $resolver->resolve('phpcpd');
@@ -37,24 +46,24 @@ class DuplicationGate implements GateInterface
 
     private function runPhpcpd(string $phpcpd, Baseline $baseline, ToolResolver $resolver): GateResult
     {
-        $paths = array_filter([
-            $baseline->projectRoot.'/src',
-            $baseline->projectRoot.'/app',
-        ], 'is_dir');
+        $paths = (new SourcePathResolver())->resolveForBaseline($baseline);
 
         $command = [
-            $resolver->resolvePhp(), $phpcpd,
+            $resolver->resolvePhp(),
+            $phpcpd,
             '--fuzzy',
             '--verbose',
-            '--min-lines', (string) $this->getBaselineMinLines($baseline),
-            '--min-tokens', (string) $this->getBaselineMinTokens($baseline),
+            '--min-lines',
+            (string) $this->getBaselineMinLines($baseline),
+            '--min-tokens',
+            (string) $this->getBaselineMinTokens($baseline),
             ...$paths,
         ];
 
-        $process = new Process($command);
+        $process = new Process($command, timeout: $baseline->getGateTimeout('duplication'));
         $process->run();
 
-        $output = $process->getOutput().$process->getErrorOutput();
+        $output = $process->getOutput() . $process->getErrorOutput();
 
         return $this->parseResult($output, $baseline);
     }
@@ -73,10 +82,10 @@ class DuplicationGate implements GateInterface
             '/-\s+(\S+):(\d+)-(\d+)\s+\(\d+\s+lines?\)\s*\n\s+(\S+):(\d+)-(\d+)/',
             $output,
             $matches,
-            PREG_SET_ORDER
+            PREG_SET_ORDER,
         );
 
-        $root = rtrim($baseline->projectRoot, '/').'/';
+        $root = rtrim($baseline->projectRoot, '/') . '/';
 
         foreach ($matches as $m) {
             $fileA = $this->relativePath($m[1], $root);
@@ -84,14 +93,11 @@ class DuplicationGate implements GateInterface
             $lineCount = (int) ($m[3] - $m[2] + 1);
 
             $cloneDetails[] = [
-                'file_a' => $fileA.':'.$m[2].'-'.$m[3],
-                'file_b' => $fileB.':'.$m[5].'-'.$m[6],
+                'file_a' => $fileA . ':' . $m[2] . '-' . $m[3],
+                'file_b' => $fileB . ':' . $m[5] . '-' . $m[6],
                 'lines' => $lineCount,
             ];
-            $clones[] = sprintf(
-                '%s:%s-%s <-> %s:%s-%s',
-                $fileA, $m[2], $m[3], $fileB, $m[5], $m[6]
-            );
+            $clones[] = sprintf('%s:%s-%s <-> %s:%s-%s', $fileA, $m[2], $m[3], $fileB, $m[5], $m[6]);
         }
 
         $cloneCount = count($clones);
@@ -107,7 +113,7 @@ class DuplicationGate implements GateInterface
                 'message' => sprintf(
                     'Duplication increased from %.2f%% to %.2f%% — refactor duplicated code',
                     $baselineDup,
-                    $percentage
+                    $percentage,
                 ),
                 'files' => array_slice($clones, 0, 20),
             ]];
@@ -128,23 +134,28 @@ class DuplicationGate implements GateInterface
 
     private function getBaselineDup(Baseline $baseline): float
     {
-        $val = $baseline->get('duplication', 'percentage', 2.0);
+        if ($baseline->getConfig('duplication', 'mode', 'no_regression') === 'absolute') {
+            $maximum = $baseline->getConfig('duplication', 'max_percentage', 0.0);
 
-        return is_numeric($val) ? (float) $val : 2.0;
+            return is_numeric($maximum) ? (float) $maximum : 0.0;
+        }
+        $val = $baseline->getResult('duplication', 'percentage', self::DUPLICATION_PERCENT);
+
+        return is_numeric($val) ? (float) $val : self::DUPLICATION_PERCENT;
     }
 
     private function getBaselineMinLines(Baseline $baseline): int
     {
-        $val = $baseline->get('duplication', 'min_lines', 3);
+        $val = $baseline->getConfig('duplication', 'min_lines', self::DUPLICATION_MIN_LINE);
 
-        return is_int($val) ? $val : 3;
+        return is_int($val) ? $val : self::DUPLICATION_MIN_LINE;
     }
 
     private function getBaselineMinTokens(Baseline $baseline): int
     {
-        $val = $baseline->get('duplication', 'min_tokens', 30);
+        $val = $baseline->getConfig('duplication', 'min_tokens', self::DUPLICATION_MIN_TOKENS);
 
-        return is_int($val) ? $val : 30;
+        return is_int($val) ? $val : self::DUPLICATION_MIN_TOKENS;
     }
 
     private function relativePath(string $path, string $root): string

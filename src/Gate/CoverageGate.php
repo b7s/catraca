@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
@@ -8,6 +10,7 @@ use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
 use B7S\Catraca\GateResult;
+use B7S\Catraca\GateToolRegistry;
 use B7S\Catraca\ToolResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -16,18 +19,15 @@ use function sprintf;
 
 class CoverageGate implements GateInterface
 {
+    private const float COVERAGE_PERCENT = 85.0;
+
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
         $cwd = $resolver->getProjectRoot();
 
-        $pest = $resolver->resolve('pest');
-        if ($pest !== null) {
-            return $this->runRunner($pest, $baseline, $resolver, $cwd);
-        }
-
-        $phpunit = $resolver->resolve('phpunit');
-        if ($phpunit !== null) {
-            return $this->runRunner($phpunit, $baseline, $resolver, $cwd);
+        $tool = GateToolRegistry::resolve($baseline, $resolver, 'coverage');
+        if ($tool !== null) {
+            return $this->runRunner($tool->path, $baseline, $resolver, $cwd);
         }
 
         return new GateResult(
@@ -41,17 +41,22 @@ class CoverageGate implements GateInterface
 
     private function runRunner(string $runner, Baseline $baseline, ToolResolver $resolver, string $cwd): GateResult
     {
-        $tmpDir = sys_get_temp_dir().'/catraca-'.uniqid('', true);
-        if (! mkdir($tmpDir, 0755, true) && ! is_dir($tmpDir)) {
+        $tmpDir = sys_get_temp_dir() . '/catraca-' . uniqid('', true);
+        if (!mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
             throw new RuntimeException(sprintf('Directory "%s" was not created', $tmpDir));
         }
 
-        $cloverPath = $tmpDir.'/clover.xml';
+        $cloverPath = $tmpDir . '/clover.xml';
 
-        $process = new Process([
-            $resolver->resolvePhp(), $runner,
-            '--coverage-clover='.$cloverPath,
-        ], $cwd, timeout: null);
+        $process = new Process(
+            [
+                $resolver->resolvePhp(),
+                $runner,
+                '--coverage-clover=' . $cloverPath,
+            ],
+            $cwd,
+            timeout: $baseline->getGateTimeout('coverage'),
+        );
         $process->run();
 
         $coverage = $this->parseClover($cloverPath);
@@ -82,9 +87,14 @@ class CoverageGate implements GateInterface
 
     private function getBaselineCoverage(Baseline $baseline): float
     {
-        $val = $baseline->get('coverage', 'percentage', 85.0);
+        if ($baseline->getConfig('coverage', 'mode', 'no_regression') === 'absolute') {
+            $floor = $baseline->getConfig('coverage', 'floor', 85.0);
 
-        return is_numeric($val) ? (float) $val : 85.0;
+            return is_numeric($floor) ? (float) $floor : 85.0;
+        }
+        $val = $baseline->getResult('coverage', 'percentage', self::COVERAGE_PERCENT);
+
+        return is_numeric($val) ? (float) $val : self::COVERAGE_PERCENT;
     }
 
     private function evaluateCoverage(?float $coverage, float $baselineCoverage): array
@@ -96,7 +106,11 @@ class CoverageGate implements GateInterface
             $status = Status::Fail;
             $actions = [[
                 'type' => ActionType::AddTests,
-                'message' => sprintf('Coverage dropped from %.2f%% to %.2f%% — add more tests', $baselineCoverage, $coverage),
+                'message' => sprintf(
+                    'Coverage dropped from %.2f%% to %.2f%% — add more tests',
+                    $baselineCoverage,
+                    $coverage,
+                ),
                 'files' => [],
             ]];
         }
@@ -106,7 +120,7 @@ class CoverageGate implements GateInterface
 
     private function parseClover(string $path): ?float
     {
-        if (! file_exists($path)) {
+        if (!file_exists($path)) {
             return null;
         }
 
@@ -144,10 +158,10 @@ class CoverageGate implements GateInterface
 
     private function cleanup(string $dir): void
     {
-        if (! is_dir($dir)) {
+        if (!is_dir($dir)) {
             return;
         }
-        $files = glob($dir.'/*');
+        $files = glob($dir . '/*');
         if ($files !== false) {
             foreach ($files as $file) {
                 @unlink($file);
