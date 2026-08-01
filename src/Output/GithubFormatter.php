@@ -27,7 +27,7 @@ class GithubFormatter
         foreach ($result->getGates() as $gate) {
             $icon = match ($gate->status) {
                 Status::Pass => '✔',
-                Status::Fail => '✘',
+                Status::Fail => '🚫',
                 Status::Warn => '⚠',
                 Status::Skip => '—',
                 Status::Cancelled => '�',
