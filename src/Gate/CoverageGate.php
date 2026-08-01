@@ -51,7 +51,7 @@ class CoverageGate implements GateInterface
         $process = new Process([
             $resolver->resolvePhp(), $runner,
             '--coverage-clover='.$cloverPath,
-        ], $cwd);
+        ], $cwd, timeout: null);
         $process->run();
 
         $coverage = $this->parseClover($cloverPath);
