@@ -22,7 +22,9 @@ use function array_merge;
 use function array_slice;
 use function count;
 use function is_array;
+use function is_bool;
 use function is_int;
+use function is_string;
 use function sprintf;
 
 readonly class PerformanceGate implements GateInterface
@@ -44,8 +46,8 @@ readonly class PerformanceGate implements GateInterface
 
         $enabledRules = $this->getEnabledRules($baseline);
         $tool = GateToolRegistry::resolve($baseline, $resolver, 'performance');
-        $mago = $tool?->name === 'mago' ? $tool->path : null;
-        $fixer = $tool?->name === 'php-cs-fixer' ? $tool->path : null;
+        $mago = $tool !== null && $tool->name === 'mago' ? $tool->path : null;
+        $fixer = $tool !== null && $tool->name === 'php-cs-fixer' ? $tool->path : null;
         $paths = $this->pathResolver->resolveForBaseline($baseline);
 
         if ($mago !== null) {
@@ -116,15 +118,11 @@ readonly class PerformanceGate implements GateInterface
             );
         }
 
-        $baselineViolations = $baseline->getResult('performance', 'violations', self::MAX_VIOLATIONS);
+        $baselineViolations = $baseline->getIntResult('performance', 'violations', self::MAX_VIOLATIONS);
         [$status, $actions] = $this->evaluateViolations($violations, $files, $messages, $reasons);
 
         $message = $violations > self::MAX_VIOLATIONS
-            ? sprintf(
-                '%d improvement(s) found (baseline: %d)',
-                $violations,
-                is_int($baselineViolations) ? $baselineViolations : self::MAX_VIOLATIONS,
-            )
+            ? sprintf('%d improvement(s) found (baseline: %d)', $violations, $baselineViolations)
             : 'No performance improvements needed';
 
         return new GateResult(
@@ -201,7 +199,7 @@ readonly class PerformanceGate implements GateInterface
     }
 
     /**
-     * @param  array<string, mixed>  $enabledRules
+     * @param  array<string, bool>  $enabledRules
      */
     public static function buildRulesJson(array $enabledRules): string
     {
@@ -211,12 +209,13 @@ readonly class PerformanceGate implements GateInterface
             if (!($enabledRules[$key] ?? false)) {
                 continue;
             }
+            /** @var array<string, mixed>|string|bool|null $decoded */
             $decoded = json_decode($config['rule'], true);
             if (is_array($decoded)) {
                 foreach ($decoded as $name => $cfg) {
                     $rules[$name] = $cfg;
                 }
-            } else {
+            } elseif (is_string($decoded) || is_bool($decoded)) {
                 $rules[$config['rule']] = true;
             }
         }
@@ -229,9 +228,17 @@ readonly class PerformanceGate implements GateInterface
      */
     private function getEnabledRules(Baseline $baseline): array
     {
-        $rules = $baseline->getConfig('performance', 'rules', []);
-        if (is_array($rules) && $rules !== []) {
-            return $rules;
+        /** @var array<string, mixed> $rules */
+        $rules = $baseline->getArrayConfig('performance', 'rules', []);
+        if ($rules !== []) {
+            $enabled = [];
+            foreach ($rules as $rule => $value) {
+                if (is_bool($value)) {
+                    $enabled[$rule] = $value;
+                }
+            }
+
+            return $enabled;
         }
 
         $defaults = array_fill_keys(array_keys(self::getRuleRegistry()), true);
@@ -240,6 +247,10 @@ readonly class PerformanceGate implements GateInterface
         return $defaults;
     }
 
+    /**
+     * @param  array<int, string>  $paths
+     * @return array{violations: int, files: array<int, string>}
+     */
     private function runCsFixerRules(
         string $fixer,
         ToolResolver $resolver,
@@ -262,6 +273,7 @@ readonly class PerformanceGate implements GateInterface
             $cmd[] = $path;
         }
 
+        /** @var array<int, string> $cmd */
         $process = new Process($cmd, timeout: $timeout);
         $process->run();
 

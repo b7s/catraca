@@ -8,15 +8,30 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 
 use function array_merge;
+use function implode;
 use function sprintf;
 use function trim;
 
 final class MagoRunner
 {
     /** @param array<int, string> $paths */
+    public const array PERFORMANCE_RULES = [
+        'instanceof-stringable',
+        'no-redundant-yield-from',
+        'no-sprintf-concat',
+        'prefer-static-closure',
+    ];
+
     public function diagnostics(string $mago, string $command, array $paths, Baseline $baseline): MagoRunResult
     {
-        $arguments = array_merge($this->baseArguments($mago, $baseline), [$command], $paths, [
+        $commandArguments = [$command];
+        if ($command === 'lint') {
+            $commandArguments[] = '--only';
+            $commandArguments[] = implode(',', self::PERFORMANCE_RULES);
+        }
+
+        /** @var array<int, string> $arguments */
+        $arguments = array_merge($this->baseArguments($mago, $baseline), $commandArguments, $paths, [
             '--reporting-format',
             'json',
             '--minimum-report-level',
@@ -24,7 +39,6 @@ final class MagoRunner
             '--minimum-fail-level',
             $baseline->getMagoMinimumReportLevel(),
         ]);
-
         $result = $this->execute($arguments, $baseline, $command);
         $issues = MagoResultParser::parse($result->output);
         if ($issues === null) {
@@ -52,7 +66,7 @@ final class MagoRunner
         return $this->execute(
             array_merge(
                 $this->baseArguments($mago, $baseline),
-                ['lint'],
+                ['lint', '--only', implode(',', self::PERFORMANCE_RULES)],
                 $paths,
                 ['--fix', '--format-after-fix', '--fail-on-remaining'],
             ),

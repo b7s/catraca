@@ -150,6 +150,10 @@ class SecuritySubCheck
 
     private const string INSECURE_RNG_SECURITY_KEYWORDS = 'token|secret|reset|csrf|nonce|salt|password|verifier|api_?key|otp|2fa|confirmation';
 
+    /**
+     * @param  string  $root
+     * @param  array<int, string>  $paths
+     */
     public function __construct(
         private readonly string $root,
         private readonly array $paths,
@@ -558,8 +562,9 @@ class SecuritySubCheck
 
         $envPath = $this->root . '/.env';
         if (file_exists($envPath)) {
-            exec('git -C ' . escapeshellarg($this->root) . ' ls-files --error-unmatch .env 2>/dev/null', $out, $code);
-            if ($code === 0) {
+            $process = new Process(['git', 'ls-files', '--error-unmatch', '.env'], $this->root);
+            $process->run();
+            if ($process->isSuccessful()) {
                 $findings[] = '.env is actively tracked by git — remove with `git rm --cached .env`';
             }
         }
@@ -583,12 +588,21 @@ class SecuritySubCheck
         $findings = [];
 
         foreach (['packages', 'packages-dev'] as $section) {
-            foreach ($lock[$section] ?? [] as $package) {
+            $packages = $lock[$section] ?? null;
+            if (!is_array($packages)) {
+                continue;
+            }
+
+            foreach ($packages as $package) {
+                if (!is_array($package)) {
+                    continue;
+                }
+
                 $name = $package['name'] ?? null;
-                $version = $package['version'] ?? '?';
+                $version = is_string($package['version'] ?? null) ? $package['version'] : '?';
                 $time = $package['time'] ?? null;
 
-                if ($name === null || $time === null) {
+                if (!is_string($name) || !is_string($time)) {
                     continue;
                 }
 

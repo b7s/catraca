@@ -9,6 +9,7 @@ use B7S\Catraca\GateToolRegistry;
 use B7S\Catraca\ToolResolver;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 use function chmod;
 use function file_exists;
@@ -31,7 +32,7 @@ final class GateToolRegistryTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['catraca_baseline.json', 'vendor/bin/pint'] as $file) {
+        foreach (['catraca_baseline.json', 'vendor/bin/mago', 'vendor/bin/pint'] as $file) {
             if (file_exists($this->tmpDir . '/' . $file)) {
                 unlink($this->tmpDir . '/' . $file);
             }
@@ -60,7 +61,7 @@ final class GateToolRegistryTest extends TestCase
     {
         $baseline = new Baseline($this->tmpDir);
         $baseline->write([
-            'config' => ['style' => ['tool' => 'prettier']],
+            'config' => ['tools' => ['format' => 'prettier']],
             'results' => [],
         ]);
 
@@ -68,5 +69,45 @@ final class GateToolRegistryTest extends TestCase
         $this->expectExceptionMessage('Invalid tool "prettier" for style. Use one of: auto, mago, pint, php-cs-fixer.');
 
         GateToolRegistry::candidates($baseline, 'style');
+    }
+
+    public function test_auto_falls_back_when_mago_is_below_the_minimum_version(): void
+    {
+        $this->writeTool('mago', "#!/bin/sh\necho 'mago 1.44.9'\n");
+        $this->writeTool('pint', "#!/bin/sh\nexit 0\n");
+        $baseline = new Baseline($this->tmpDir);
+        $baseline->init();
+
+        $tool = GateToolRegistry::resolve($baseline, new ToolResolver($this->tmpDir), 'style');
+
+        self::assertNotNull($tool);
+        self::assertSame('pint', $tool->name);
+    }
+
+    public function test_explicit_old_mago_reports_the_required_minimum_version(): void
+    {
+        $this->writeTool('mago', "#!/bin/sh\necho 'mago 1.44.9'\n");
+        $baseline = new Baseline($this->tmpDir);
+        $baseline->write([
+            'config' => [
+                'tools' => [
+                    'format' => 'mago',
+                    'options' => ['mago' => ['minimum_version' => '1.45.0']],
+                ],
+            ],
+            'results' => [],
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Mago 1.44.9 does not satisfy the required minimum version 1.45.0.');
+
+        GateToolRegistry::resolve($baseline, new ToolResolver($this->tmpDir), 'style');
+    }
+
+    private function writeTool(string $name, string $contents): void
+    {
+        $path = $this->tmpDir . '/vendor/bin/' . $name;
+        file_put_contents($path, $contents);
+        chmod($path, 0755);
     }
 }

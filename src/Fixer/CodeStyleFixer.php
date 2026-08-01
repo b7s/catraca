@@ -28,7 +28,7 @@ readonly class CodeStyleFixer implements FixerInterface
     public function fix(Baseline $baseline, ToolResolver $resolver): FixerResult
     {
         $tool = GateToolRegistry::resolve($baseline, $resolver, 'style');
-        if ($tool?->name === 'mago') {
+        if ($tool !== null && $tool->name === 'mago') {
             $mago = $tool->path;
             try {
                 $this->magoRunner->format($mago, $this->pathResolver->resolveForBaseline($baseline), $baseline, false);
@@ -39,7 +39,7 @@ readonly class CodeStyleFixer implements FixerInterface
             }
         }
 
-        $pint = $tool?->name === 'pint' ? $tool->path : null;
+        $pint = $tool !== null && $tool->name === 'pint' ? $tool->path : null;
         if ($pint !== null) {
             $result = $this->runner->run([
                 $resolver->resolvePhp(),
@@ -50,7 +50,7 @@ readonly class CodeStyleFixer implements FixerInterface
             return $this->buildResult('Code Style (pint)', $result);
         }
 
-        $fixer = $tool?->name === 'php-cs-fixer' ? $tool->path : null;
+        $fixer = $tool !== null && $tool->name === 'php-cs-fixer' ? $tool->path : null;
         if ($fixer !== null) {
             $paths = $this->pathResolver->resolve($resolver->getProjectRoot(), $baseline->getSourceDirs());
             $cmd = [$resolver->resolvePhp(), $fixer, 'fix'];

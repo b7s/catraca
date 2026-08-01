@@ -35,7 +35,13 @@ final class MagoIntegrationTest extends TestCase
         file_put_contents($this->tmpDir . '/src/Example.php', "<?php\n");
         file_put_contents($this->tmpDir . '/vendor/bin/mago', <<<'PHP'
             #!/usr/bin/env php
+
             <?php
+
+            if (in_array('--version', $argv, true)) {
+                echo "mago 1.46.0\n";
+                exit(0);
+            }
 
             $command = in_array('format', $argv, true)
                 ? 'format'
@@ -121,6 +127,10 @@ final class MagoIntegrationTest extends TestCase
         self::assertTrue(str_contains($calls, '--workspace ' . $this->tmpDir));
         self::assertTrue(str_contains($calls, '--threads 1'));
         self::assertTrue(str_contains($calls, '--reporting-format json'));
-        self::assertTrue(str_contains($calls, '--minimum-report-level warning'));
+        self::assertTrue(str_contains($calls, '--minimum-report-level error'));
+        self::assertTrue(str_contains(
+            $calls,
+            '--only instanceof-stringable,no-redundant-yield-from,no-sprintf-concat,prefer-static-closure',
+        ));
     }
 }

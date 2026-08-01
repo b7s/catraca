@@ -50,6 +50,7 @@ final class ParallelTaskRunner
         }
 
         $client = new ParalliteClient();
+        /** @var array<int, array{pid: int}> $active */
         $active = [];
         $results = [];
         $nextIndex = 0;
@@ -57,7 +58,9 @@ final class ParallelTaskRunner
 
         while ($nextIndex < $taskCount || $active !== []) {
             while (!$this->cancelled && $nextIndex < $taskCount && count($active) < $this->maxProcesses) {
-                $onStarted?->__invoke($nextIndex);
+                if ($onStarted !== null) {
+                    $onStarted($nextIndex);
+                }
 
                 try {
                     $active[$nextIndex] = $client->async($tasks[$nextIndex]);
@@ -65,13 +68,17 @@ final class ParallelTaskRunner
                 } catch (Throwable $exception) {
                     $result = new RuntimeException($exception->getMessage(), previous: $exception);
                     $results[$nextIndex] = $result;
-                    $onFinished?->__invoke($nextIndex, $result);
+                    if ($onFinished !== null) {
+                        $onFinished($nextIndex, $result);
+                    }
                 }
 
                 $nextIndex++;
             }
 
-            $onTick?->__invoke();
+            if ($onTick !== null) {
+                $onTick();
+            }
             $completedAny = false;
 
             foreach (array_keys($active) as $index) {
@@ -80,6 +87,7 @@ final class ParallelTaskRunner
                     continue;
                 }
 
+                // @mago-ignore analysis:possibly-invalid-argument
                 try {
                     $result = $client->await($future);
                 } catch (Throwable $exception) {
@@ -91,7 +99,9 @@ final class ParallelTaskRunner
                 }
                 $results[$index] = $result;
                 unset($active[$index]);
-                $onFinished?->__invoke($index, $result);
+                if ($onFinished !== null) {
+                    $onFinished($index, $result);
+                }
                 $completedAny = true;
                 unset($this->activePids[$index]);
             }
@@ -103,7 +113,9 @@ final class ParallelTaskRunner
         while ($nextIndex < $taskCount) {
             $result = new CancelledException('Cancelled before execution');
             $results[$nextIndex] = $result;
-            $onFinished?->__invoke($nextIndex, $result);
+            if ($onFinished !== null) {
+                $onFinished($nextIndex, $result);
+            }
             $nextIndex++;
         }
 

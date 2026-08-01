@@ -13,6 +13,8 @@ use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Throwable;
 
+use function is_array;
+
 readonly class PerformanceFixer implements FixerInterface
 {
     public function __construct(
@@ -29,7 +31,7 @@ readonly class PerformanceFixer implements FixerInterface
     public function fix(Baseline $baseline, ToolResolver $resolver): FixerResult
     {
         $tool = GateToolRegistry::resolve($baseline, $resolver, 'performance');
-        if ($tool?->name === 'mago') {
+        if ($tool !== null && $tool->name === 'mago') {
             $mago = $tool->path;
             try {
                 $result = $this->magoRunner->fixLint(
@@ -51,7 +53,7 @@ readonly class PerformanceFixer implements FixerInterface
             }
         }
 
-        $fixer = $tool?->name === 'php-cs-fixer' ? $tool->path : null;
+        $fixer = $tool !== null && $tool->name === 'php-cs-fixer' ? $tool->path : null;
         if ($fixer === null) {
             return new FixerResult(
                 label: $this->getLabel(),
@@ -60,7 +62,9 @@ readonly class PerformanceFixer implements FixerInterface
             );
         }
 
-        $enabledRules = $baseline->getConfig('performance', 'rules', []);
+        $enabledRules = $baseline->getArrayConfig('performance', 'rules', []);
+        /** @var array<string, bool> $enabledRules */
+        $enabledRules = array_filter($enabledRules, static fn(mixed $v): bool => is_bool($v), ARRAY_FILTER_USE_BOTH);
         $rulesJson = PerformanceGate::buildRulesJson($enabledRules);
 
         if ($rulesJson === '{}') {

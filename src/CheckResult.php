@@ -116,8 +116,15 @@ class CheckResult
         return count(array_filter($this->gates, static fn(GateResult $g): bool => $g->status === Status::Skip));
     }
 
-    /**
-     * @return array<string, mixed>
+    /** @return array{
+     *     schema: string,
+     *     type: string,
+     *     result: string,
+     *     timestamp: string,
+     *     summary: array{total: int, passed: int, failed: int, skipped: int},
+     *     gates: array<int, array<string, mixed>>,
+     *     actions: array<int, array{type: string, priority: int, message: string, files: array<int, string>, reasons: array<int, string>}>
+     * }
      */
     public function toArray(): array
     {

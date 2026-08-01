@@ -97,6 +97,9 @@ class CoverageGate implements GateInterface
         return is_numeric($val) ? (float) $val : self::COVERAGE_PERCENT;
     }
 
+    /**
+     * @return array{0: Status, 1: array<int, array{type: ActionType, message: string, files: array<int, string>}>|null}
+     */
     private function evaluateCoverage(?float $coverage, float $baselineCoverage): array
     {
         $status = Status::Pass;
@@ -124,18 +127,31 @@ class CoverageGate implements GateInterface
             return null;
         }
 
-        $xml = @simplexml_load_string(file_get_contents($path));
+        $contents = file_get_contents($path);
+        if ($contents === false) {
+            return null;
+        }
+
+        $xml = @simplexml_load_string($contents);
         if ($xml === false) {
             return null;
         }
 
-        $metrics = $xml->project->metrics ?? $xml->metrics;
+        /** @var \SimpleXMLElement|null $metrics */
+        $metrics = null;
+        $project = $xml->project ?? null;
+        if ($project !== null) {
+            $metrics = $project->metrics ?? null;
+        }
+        if ($metrics === null) {
+            $metrics = $xml->metrics ?? null;
+        }
         if ($metrics === null) {
             return null;
         }
 
-        $statements = (float) ($metrics['statements'] ?? 0);
-        $covered = (float) ($metrics['coveredstatements'] ?? 0);
+        $statements = (float) (string) ($metrics['statements'] ?? 0);
+        $covered = (float) (string) ($metrics['coveredstatements'] ?? 0);
 
         if ($statements <= 0) {
             return null;

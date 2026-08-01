@@ -24,7 +24,7 @@ abstract class ProjectCommand extends Command implements SignalableCommandInterf
         ): int => $this->executeForProject($input, $output, $projectRoot, $catraca));
     }
 
-    /** @return array<int, int> */
+    /** @return list<int> */
     public function getSubscribedSignals(): array
     {
         return [2, 15];

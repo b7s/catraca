@@ -2,6 +2,7 @@
 
 namespace B7S\Catraca\Output;
 
+use function max;
 use function mb_strlen;
 use function sprintf;
 use function str_repeat;
@@ -17,6 +18,6 @@ trait BoxDrawer
 
     private function divider(int $width = 60): string
     {
-        return '  ' . str_repeat('─', $width);
+        return '  ' . str_repeat('─', max(0, $width));
     }
 }

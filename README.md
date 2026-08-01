@@ -33,11 +33,11 @@ Gates run in order. A failure blocks the PR.
 
 ## Dependencies
 
-Catraca wraps your existing PHP quality tools. Install the ones you need. Mago 1.45.0 is the preferred v2 backend:
+Catraca wraps your existing PHP quality tools. Install the ones you need. Mago 1.45.0 or newer is the preferred v2 backend:
 
 ```bash
 # Preferred formatter, analyzer, and linter
-composer require --dev carthage-software/mago:1.45.0
+composer require --dev "carthage-software/mago:>=1.45.0"
 vendor/bin/mago init
 
 # Code style fallbacks
@@ -102,9 +102,36 @@ Configuration and measured results are stored separately:
     "schema": "catraca/v2",
     "config": {
         "source_dirs": {
-            "paths": ["src", "app", "lib"]
+            "paths": ["src", "app", "lib"],
+            "exclude": ["vendor", ".git", "node_modules"]
+        },
+        "policy": {
+            "missing_tool": "skip",
+            "unavailable_metric": "warn",
+            "internal_error": "fail"
+        },
+        "process": {
+            "timeout_seconds": 1200
+        },
+        "tools": {
+            "format": "auto",
+            "analyze": "auto",
+            "coverage": "auto",
+            "lint": "auto",
+            "options": {
+                "mago": {
+                    "threads": 0,
+                    "minimum_report_level": "error",
+                    "minimum_version": "1.45.0"
+                }
+            }
+        },
+        "history": {
+            "enabled": false,
+            "retention": 50
         },
         "security": {
+            "mode": "no_regression",
             "rules": {
                 "hardcoded_secrets": true,
                 "sql_injection": true,
@@ -113,43 +140,42 @@ Configuration and measured results are stored separately:
             "released_days": 3
         },
         "duplication": {
+            "mode": "no_regression",
+            "max_percentage": 0.0,
             "min_lines": 3,
             "min_tokens": 30
         },
         "file_size": {
+            "mode": "no_regression",
             "max_lines": 1000
         },
         "complexity": {
+            "mode": "no_regression",
             "block_at": 50,
             "warn_at": 20
         },
-        "style": {
-            "tool": "auto"
-        },
-        "static_analysis": {
-            "tool": "auto"
-        },
-        "coverage": {
-            "tool": "auto"
-        },
         "performance": {
-            "tool": "auto"
+            "mode": "no_regression",
+            "rules": {
+                "global_namespace_import": true,
+                "no_unused_imports": true,
+                "fully_qualified_strict_types": true,
+                "condition_order": true
+            },
+            "fixers": {
+                "condition_order": false
+            }
         },
-        "mago": {
-            "enabled": true,
-            "format": true,
-            "analyze": true,
-            "lint": true,
-            "version": "1.45.0",
-            "threads": 0,
-            "minimum_report_level": "warning"
-        },
+        "style": { "mode": "no_regression" },
+        "static_analysis": { "mode": "no_regression" },
+        "coverage": { "mode": "no_regression", "floor": 85.0 },
         "parallel": {
             "enabled": true,
             "max_processes": 4
         }
     },
     "results": {
+        "security": { "advisories": 0, "findings": 0, "critical": 0 },
         "style": { "violations": 0 },
         "static_analysis": { "errors": 0 },
         "coverage": { "percentage": 85.0 },
@@ -169,42 +195,74 @@ Configuration and measured results are stored separately:
 
 ### Choosing a tool for each validation
 
-For gates with interchangeable backends, set `tool` to `auto` or to one explicit tool. All fallback orders and valid values are defined centrally, so an invalid value fails with a message listing the correct choices.
+For gates with interchangeable backends, set the value under `config.tools` to `auto` or to one explicit tool. All fallback orders and valid values are defined centrally, so an invalid value fails with a message listing the correct choices.
 
-| Validation | Valid `tool` values | What Catraca runs |
-|------------|---------------------|-------------------|
-| Code Style | `auto`, `mago`, `pint`, `php-cs-fixer` | `mago format --check`, Pint, or PHP CS Fixer |
-| Static Analysis | `auto`, `mago`, `phpstan`, `psalm` | `mago analyze`, PHPStan, or Psalm |
-| Test Coverage | `auto`, `pest`, `phpunit` | Pest or PHPUnit with Clover output |
-| Performance | `auto`, `mago`, `php-cs-fixer` | `mago lint` or PHP CS Fixer, plus built-in autoload and condition-order checks |
-| Security | Not selectable | Composer audit plus built-in source checks |
-| Duplication | Not selectable | PHPCPD |
-| File Size | Not selectable | Built-in scanner |
-| Complexity | Not selectable | PHP Metrics |
+| Validation | Key under `config.tools` | Valid values | What Catraca runs |
+|------------|--------------------------|--------------|-------------------|
+| Code Style | `format` | `auto`, `mago`, `pint`, `php-cs-fixer` | `mago format --check`, Pint, or PHP CS Fixer |
+| Static Analysis | `analyze` | `auto`, `mago`, `phpstan`, `psalm` | `mago analyze`, PHPStan, or Psalm |
+| Test Coverage | `coverage` | `auto`, `pest`, `phpunit` | Pest or PHPUnit with Clover output |
+| Performance | `lint` | `auto`, `mago`, `php-cs-fixer` | `mago lint` or PHP CS Fixer, plus built-in autoload and condition-order checks |
+| Security | Not selectable | — | Composer audit plus built-in source checks |
+| Duplication | Not selectable | — | PHPCPD |
+| File Size | Not selectable | — | Built-in scanner |
+| Complexity | Not selectable | — | PHP Metrics |
 
 `auto` is the v2 default. It selects the first installed tool in the order shown in the Quality Gates table; Mago is preferred for style, static analysis, and performance. An explicit choice does not silently switch to a different external tool if that executable is missing.
+
+**Example — Switching from Mago to PHPStan + Pint + PHPUnit:**
 
 ```json
 {
     "config": {
-        "style": { "tool": "mago" },
-        "static_analysis": { "tool": "phpstan" },
-        "coverage": { "tool": "phpunit" },
-        "performance": { "tool": "mago" },
-        "mago": {
-            "enabled": true,
-            "format": true,
-            "analyze": true,
-            "lint": true,
-            "version": "1.45.0",
-            "threads": 0,
-            "minimum_report_level": "warning"
+        "tools": {
+            "format": "pint",
+            "analyze": "phpstan",
+            "coverage": "phpunit",
+            "lint": "php-cs-fixer"
         }
     }
 }
 ```
 
-`mago.threads: 0` shares Catraca's worker budget automatically. With the default four gate workers, each Mago process uses one thread to avoid CPU oversubscription. Set a positive value up to 128 to override it. `minimum_report_level` accepts `help`, `note`, `warning`, or `error`.
+**Example — Mixed: Mago for analyze and lint, Pint for format, PHPUnit for coverage:**
+
+```json
+{
+    "config": {
+        "tools": {
+            "format": "pint",
+            "analyze": "mago",
+            "coverage": "phpunit",
+            "lint": "mago"
+        }
+    }
+}
+```
+
+**Example — Mago with custom configuration:**
+
+```json
+{
+    "config": {
+        "tools": {
+            "format": "mago",
+            "analyze": "mago",
+            "coverage": "auto",
+            "lint": "mago",
+            "options": {
+                "mago": {
+                    "threads": 0,
+                    "minimum_report_level": "warning",
+                    "minimum_version": "1.45.0"
+                }
+            }
+        }
+    }
+}
+```
+
+`tools.options.mago.threads: 0` shares Catraca's worker budget automatically. With the default four gate workers, each Mago process uses one thread to avoid CPU oversubscription. Set a positive value up to 128 to override it. `minimum_report_level` accepts `help`, `note`, `warning`, or `error`.
 
 The Mago mappings stay separate: formatter findings update `results.style`, analyzer findings update `results.static_analysis`, and linter findings contribute to `results.performance`. Mago does not replace PHPCPD duplication percentages or PHP Metrics complexity values.
 
@@ -280,9 +338,9 @@ Terminal-friendly output with ANSI colors:
   ────────────────────────────────────────────────────────────
   ✔ Security Audit          PASS     0 total advisories, 0 critical/high
   ✔ Code Style              PASS     0 violations (baseline: 0)
-  ✘ Static Analysis         FAIL     3 errors (baseline: 0)
+  🚫 Static Analysis         FAIL     3 errors (baseline: 0)
   ✔ Test Coverage           PASS     85.00% (baseline: 85.00%)
-  ✘ Duplication             FAIL     5.22% (baseline: 0.00%, 2 clones)
+  🚫 Duplication             FAIL     5.22% (baseline: 0.00%, 2 clones)
   ✔ File Size               PASS     0 files exceed 1000 lines
   ✔ Cyclomatic Complexity   PASS     max CCN 8, 0 violations (>50), 1 warnings (>20)
   ✔ Performance             PASS     No performance improvements needed

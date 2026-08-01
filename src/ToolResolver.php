@@ -82,7 +82,7 @@ class ToolResolver
     private function getComposerGlobalBin(): string
     {
         $home = getenv('COMPOSER_HOME');
-        if (is_string($home) && $home !== '') {
+        if ($home !== false && $home !== '') {
             return $home . '/vendor/bin';
         }
 
@@ -91,7 +91,7 @@ class ToolResolver
                 ? $_SERVER['HOME'] ?? '~/'
                 : (getenv('APPDATA') ?: '~/');
 
-        return (is_string($fallback) ? $fallback : '~/') . '/vendor/bin';
+        return $fallback . '/vendor/bin';
     }
 
     private function isExecutable(string $path): bool

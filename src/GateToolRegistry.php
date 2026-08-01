@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace B7S\Catraca;
 
 use InvalidArgumentException;
+use RuntimeException;
 
 use function array_keys;
 use function implode;
@@ -15,7 +16,7 @@ final class GateToolRegistry
 {
     public const string DEFAULT = 'auto';
 
-    public const string MAGO_VERSION = '1.45.0';
+    public const string MINIMUM_MAGO_VERSION = '1.45.0';
 
     public const array FALLBACKS = [
         'style' => ['mago', 'pint', 'php-cs-fixer'],
@@ -24,23 +25,41 @@ final class GateToolRegistry
         'performance' => ['mago', 'php-cs-fixer'],
     ];
 
-    private const array MAGO_CAPABILITIES = [
+    public const array OPERATIONS = [
         'style' => 'format',
         'static_analysis' => 'analyze',
+        'coverage' => 'coverage',
         'performance' => 'lint',
     ];
 
     public static function resolve(Baseline $baseline, ToolResolver $resolver, string $gate): ?GateTool
     {
+        $selected = $baseline->getGateTool($gate);
+
         foreach (self::candidates($baseline, $gate) as $name) {
-            if ($name === 'mago' && !$baseline->isMagoEnabled(self::MAGO_CAPABILITIES[$gate])) {
+            $path = $resolver->resolve($name);
+            if ($path === null) {
                 continue;
             }
 
-            $path = $resolver->resolve($name);
-            if ($path !== null) {
-                return new GateTool($name, $path);
+            if ($name === 'mago') {
+                $minimum = $baseline->getMagoMinimumVersion();
+                $version = (new MagoVersionChecker())->detect($path, $baseline->projectRoot);
+                if ($version === null || !MagoVersionChecker::satisfies($version, $minimum)) {
+                    if ($selected !== self::DEFAULT) {
+                        throw new RuntimeException(sprintf(
+                            'Mago %s does not satisfy the required minimum version %s. Install Mago >= %s.',
+                            $version ?? 'unknown',
+                            $minimum,
+                            $minimum,
+                        ));
+                    }
+
+                    continue;
+                }
             }
+
+            return new GateTool($name, $path);
         }
 
         return null;
@@ -69,6 +88,16 @@ final class GateToolRegistry
         }
 
         return [$selected];
+    }
+
+    public static function operation(string $gate): string
+    {
+        $operation = self::OPERATIONS[$gate] ?? null;
+        if ($operation === null) {
+            throw new InvalidArgumentException(sprintf('Unknown quality gate "%s".', $gate));
+        }
+
+        return $operation;
     }
 
     /** @return array<int, string> */

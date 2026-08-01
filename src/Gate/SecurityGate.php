@@ -21,10 +21,13 @@ use function array_keys;
 use function array_map;
 use function array_merge;
 use function array_slice;
+use function array_values;
 use function count;
 use function implode;
 use function is_array;
+use function is_bool;
 use function is_int;
+use function is_string;
 use function sprintf;
 
 readonly class SecurityGate implements GateInterface
@@ -129,6 +132,8 @@ readonly class SecurityGate implements GateInterface
 
     /**
      * @return array<string, array<int, string>>
+     * @param  array<int, string>  $paths
+     * @param  array<string, bool>  $rules
      */
     private function runSubChecksSequential(
         string $root,
@@ -147,9 +152,7 @@ readonly class SecurityGate implements GateInterface
                 continue;
             }
 
-            $findingsByRule[$rule] = $rule === 'package_freshness'
-                ? $sub->checkPackageFreshness($releasedDays)
-                : $sub->{$method}();
+            $findingsByRule[$rule] = self::runSubCheck($sub, $rule, $releasedDays);
         }
 
         return $findingsByRule;
@@ -157,6 +160,8 @@ readonly class SecurityGate implements GateInterface
 
     /**
      * @return array<string, array<int, string>>
+     * @param  array<int, string>  $paths
+     * @param  array<string, bool>  $rules
      *
      * @throws Throwable
      */
@@ -171,16 +176,17 @@ readonly class SecurityGate implements GateInterface
         $closures = [];
         $ruleOrder = [];
 
-        foreach (self::SUB_CHECK_METHODS as $rule => $method) {
+        foreach (self::SUB_CHECK_METHODS as $rule => $_method) {
             if (!($rules[$rule] ?? true)) {
                 continue;
             }
 
             $ruleOrder[] = $rule;
-            $isPackageFreshness = $rule === 'package_freshness';
-            $args = $isPackageFreshness ? [$releasedDays] : [];
-
-            $closures[] = static fn() => (new SecuritySubCheck($root, $paths))->{$method}(...$args);
+            $closures[] = static fn(): array => self::runSubCheck(
+                new SecuritySubCheck($root, $paths),
+                $rule,
+                $releasedDays,
+            );
         }
 
         $rawResults = $client->awaitAll($closures);
@@ -188,7 +194,7 @@ readonly class SecurityGate implements GateInterface
         $findingsByRule = [];
         foreach ($ruleOrder as $i => $rule) {
             $data = $rawResults[$i] ?? null;
-            $findingsByRule[$rule] = !is_array($data) ? [] : $data;
+            $findingsByRule[$rule] = self::stringList($data);
         }
 
         foreach (array_keys(self::SUB_CHECK_METHODS) as $rule) {
@@ -200,6 +206,45 @@ readonly class SecurityGate implements GateInterface
         return $findingsByRule;
     }
 
+    /** @return array<int, string> */
+    private static function runSubCheck(SecuritySubCheck $subCheck, string $rule, int $releasedDays): array
+    {
+        return self::stringList(match ($rule) {
+            'hardcoded_secrets' => $subCheck->checkHardcodedSecrets(),
+            'sql_injection' => $subCheck->checkSqlInjection(),
+            'command_injection' => $subCheck->checkCommandInjection(),
+            'csrf_protection' => $subCheck->checkCsrf(),
+            'path_traversal' => $subCheck->checkPathTraversal(),
+            'insecure_deserialization' => $subCheck->checkInsecureDeserialization(),
+            'ssrf' => $subCheck->checkSsrf(),
+            'tls_verification' => $subCheck->checkTlsVerification(),
+            'insecure_rng' => $subCheck->checkInsecureRng(),
+            'gitignore_sensitive' => $subCheck->checkGitignore(),
+            'package_freshness' => $subCheck->checkPackageFreshness($releasedDays),
+            'weak_cryptography' => $subCheck->checkWeakCryptography(),
+            'cors_config' => $subCheck->checkCorsConfig(),
+            'npm_audit' => $subCheck->checkNpmAudit(),
+            default => [],
+        });
+    }
+
+    /** @return array<int, string> */
+    private static function stringList(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $strings = [];
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $strings[] = $item;
+            }
+        }
+
+        return $strings;
+    }
+
     /**
      * @return array<string, bool>
      */
@@ -207,7 +252,14 @@ readonly class SecurityGate implements GateInterface
     {
         $rules = $baseline->getConfig('security', 'rules', null);
         if (is_array($rules) && $rules !== []) {
-            return $rules;
+            $enabled = self::DEFAULT_RULES;
+            foreach ($rules as $rule => $value) {
+                if (is_string($rule) && is_bool($value)) {
+                    $enabled[$rule] = $value;
+                }
+            }
+
+            return $enabled;
         }
 
         return self::DEFAULT_RULES;

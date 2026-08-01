@@ -18,6 +18,7 @@ use function is_string;
 use function max;
 use function min;
 use function serialize;
+use function strtolower;
 
 class Baseline
 {
@@ -95,22 +96,9 @@ class Baseline
     public function updateResults(array $results): void
     {
         $data = $this->store->update(function (?array $stored) use ($results): array {
-            $data = $stored === null ? $this->defaults() : BaselineSchema::normalize($stored);
-            $target = $this->profile === 'default' ? 'results' : 'profiles';
-
+            $data = $stored === null ? $this->defaults() : BaselineSchema::normalize($this->normalizeArray($stored));
             foreach ($results as $gate => $current) {
-                if ($target === 'results') {
-                    $existing = $data['results'][$gate] ?? [];
-                    $data['results'][$gate] = array_merge(is_array($existing) ? $existing : [], $current);
-
-                    continue;
-                }
-
-                $existing = $data['profiles'][$this->profile]['results'][$gate] ?? [];
-                $data['profiles'][$this->profile]['results'][$gate] = array_merge(
-                    is_array($existing) ? $existing : [],
-                    $current,
-                );
+                $data = $this->withGateResult($data, $gate, $current);
             }
 
             return $this->prepareForWrite($data);
@@ -131,7 +119,10 @@ class Baseline
                 return $this->prepareForWrite($defaults);
             }
 
-            return $this->prepareForWrite(BaselineSchema::mergeDefaults(BaselineSchema::normalize($stored), $defaults));
+            return $this->prepareForWrite(BaselineSchema::mergeDefaults(
+                BaselineSchema::normalize($this->normalizeArray($stored)),
+                $defaults,
+            ));
         });
 
         $this->cachedData = $data;
@@ -152,11 +143,9 @@ class Baseline
     public function getSourceDirs(): array
     {
         $dirs = $this->getConfig('source_dirs', 'paths', null);
-        if (is_array($dirs) && $dirs !== []) {
-            return $dirs;
-        }
+        $resolved = $this->stringList($dirs);
 
-        return self::DEFAULT_SOURCE_DIRS;
+        return $resolved !== [] ? $resolved : self::DEFAULT_SOURCE_DIRS;
     }
 
     /** @return array<int, string> */
@@ -164,7 +153,7 @@ class Baseline
     {
         $paths = $this->getConfig('source_dirs', 'exclude', ['vendor', '.git', 'node_modules']);
 
-        return is_array($paths) ? array_values($paths) : ['vendor', '.git', 'node_modules'];
+        return $this->stringList($paths, ['vendor', '.git', 'node_modules']);
     }
 
     public function getProfile(): string
@@ -188,23 +177,26 @@ class Baseline
             return (float) $this->timeoutOverride;
         }
 
-        $gateTimeout = $this->getConfig($gate, 'timeout_seconds', null);
-        if (is_int($gateTimeout) && $gateTimeout > 0) {
+        $gateTimeout = $this->getIntConfig($gate, 'timeout_seconds', 0);
+        if ($gateTimeout > 0) {
             return (float) $gateTimeout;
         }
 
-        $timeout = $this->getConfig('process', 'timeout_seconds', 1200);
+        $timeout = $this->getIntConfig('process', 'timeout_seconds', 1200);
 
-        return is_int($timeout) && $timeout > 0 ? (float) $timeout : null;
+        return $timeout > 0 ? (float) $timeout : null;
     }
 
     public function getConfigHash(): string
     {
         $data = $this->read() ?? $this->defaults();
+        /** @var array<string, mixed> $config */
         $config = is_array($data['config'] ?? null) ? $data['config'] : [];
 
         if ($this->profile !== 'default') {
-            $profileConfig = $data['profiles'][$this->profile]['config'] ?? [];
+            /** @var mixed $profileConfigRaw */
+            $profileConfigRaw = $data['profiles'][$this->profile]['config'] ?? [];
+            $profileConfig = is_array($profileConfigRaw) ? $profileConfigRaw : [];
             if (is_array($profileConfig)) {
                 $config = array_replace_recursive($config, $profileConfig);
             }
@@ -222,15 +214,15 @@ class Baseline
             return $this->parallelOverride;
         }
 
-        $enabled = $this->getConfig('parallel', 'enabled', null);
+        $enabled = $this->getBoolConfig('parallel', 'enabled', true);
 
-        return is_bool($enabled) ? $enabled : true;
+        return $enabled;
     }
 
     public function getMaxProcesses(): int
     {
-        $maxProcesses = $this->getConfig('parallel', 'max_processes', BaselineSchema::DEFAULT_MAX_PROCESSES);
-        if (!is_int($maxProcesses) || $maxProcesses < 1) {
+        $maxProcesses = $this->getIntConfig('parallel', 'max_processes', BaselineSchema::DEFAULT_MAX_PROCESSES);
+        if ($maxProcesses < 1) {
             return BaselineSchema::DEFAULT_MAX_PROCESSES;
         }
 
@@ -239,23 +231,15 @@ class Baseline
 
     public function getGateTool(string $gate): string
     {
-        $tool = $this->getConfig($gate, 'tool', GateToolRegistry::DEFAULT);
+        $tool = $this->getStringConfig('tools', GateToolRegistry::operation($gate), GateToolRegistry::DEFAULT);
 
-        return is_string($tool) ? $tool : GateToolRegistry::DEFAULT;
-    }
-
-    public function isMagoEnabled(string $capability): bool
-    {
-        $enabled = $this->getConfig('mago', 'enabled', true);
-        $capabilityEnabled = $this->getConfig('mago', $capability, true);
-
-        return $enabled === true && $capabilityEnabled === true;
+        return strtolower($tool);
     }
 
     public function getMagoThreads(): int
     {
-        $configured = $this->getConfig('mago', 'threads', 0);
-        if (is_int($configured) && $configured > 0) {
+        $configured = $this->getIntConfig('tools', 'options.mago.threads', 0);
+        if ($configured > 0) {
             return min($configured, self::MAX_PROCESSES_LIMIT);
         }
 
@@ -264,9 +248,39 @@ class Baseline
 
     public function getMagoMinimumReportLevel(): string
     {
-        $level = $this->getConfig('mago', 'minimum_report_level', 'warning');
+        $level = $this->getStringConfig('tools', 'options.mago.minimum_report_level', 'error');
 
-        return is_string($level) && in_array($level, ['help', 'note', 'warning', 'error'], true) ? $level : 'warning';
+        return in_array($level, ['help', 'note', 'warning', 'error'], true) ? $level : 'error';
+    }
+
+    public function getMagoMinimumVersion(): string
+    {
+        $version = $this->getStringConfig(
+            'tools',
+            'options.mago.minimum_version',
+            GateToolRegistry::MINIMUM_MAGO_VERSION,
+        );
+
+        return is_string($version) && MagoVersionChecker::isValid($version)
+            ? $version
+            : GateToolRegistry::MINIMUM_MAGO_VERSION;
+    }
+
+    private function getMagoOption(string $key, mixed $default): mixed
+    {
+        /** @var array<string, mixed> $options */
+        $options = $this->getArrayConfig('tools', 'options', []);
+        if (!is_array($options)) {
+            return $default;
+        }
+
+        /** @var mixed $mago */
+        $mago = $options['mago'] ?? null;
+        if (!is_array($mago)) {
+            return $default;
+        }
+
+        return $mago[$key] ?? $default;
     }
 
     public function getConfig(string $section, string $key, mixed $default = null): mixed
@@ -277,6 +291,102 @@ class Baseline
     public function getResult(string $gate, string $key, mixed $default = null): mixed
     {
         return $this->getFromGroup('results', $gate, $key, $default);
+    }
+
+    /**
+     * Get config value as int
+     */
+    public function getIntConfig(string $section, string $key, int $default = 0): int
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getConfig($section, $key, $default);
+        return is_int($value) ? $value : $default;
+    }
+
+    /**
+     * Get config value as float
+     */
+    public function getFloatConfig(string $section, string $key, float $default = 0.0): float
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getConfig($section, $key, $default);
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
+    /**
+     * Get config value as bool
+     */
+    public function getBoolConfig(string $section, string $key, bool $default = false): bool
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getConfig($section, $key, $default);
+        return is_bool($value) ? $value : $default;
+    }
+
+    /**
+     * Get config value as string
+     */
+    public function getStringConfig(string $section, string $key, string $default = ''): string
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getConfig($section, $key, $default);
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Get config value as array
+     * @return array<string, mixed>
+     */
+    public function getArrayConfig(string $section, string $key, array $default = []): array
+    {
+        // @mago-ignore analysis:less-specific-return-statement
+        /** @phpstan-ignore-next-line */
+        $value = $this->getConfig($section, $key, $default);
+        /** @phpstan-ignore-next-line */
+        return is_array($value) ? $value : $default;
+    }
+
+    /**
+     * Get result value as int
+     */
+    public function getIntResult(string $gate, string $key, int $default = 0): int
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getResult($gate, $key, $default);
+        return is_int($value) ? $value : $default;
+    }
+
+    /**
+     * Get result value as float
+     */
+    public function getFloatResult(string $gate, string $key, float $default = 0.0): float
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getResult($gate, $key, $default);
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
+    /**
+     * Get result value as string
+     */
+    public function getStringResult(string $gate, string $key, string $default = ''): string
+    {
+        /** @phpstan-ignore-next-line */
+        $value = $this->getResult($gate, $key, $default);
+        return is_string($value) ? $value : $default;
+    }
+
+    /**
+     * Get result value as array
+     * @return array<string, mixed>
+     */
+    public function getArrayResult(string $gate, string $key, array $default = []): array
+    {
+        // @mago-ignore analysis:less-specific-return-statement
+        /** @phpstan-ignore-next-line */
+        $value = $this->getResult($gate, $key, $default);
+        /** @phpstan-ignore-next-line */
+        return is_array($value) ? $value : $default;
     }
 
     /**
@@ -292,6 +402,13 @@ class Baseline
         return $this->getResult($section, $key, $default);
     }
 
+    /**
+     * @param  string  $group
+     * @param  string  $section
+     * @param  string  $key
+     * @param  mixed   $default
+     * @return mixed
+     */
     private function getFromGroup(string $group, string $section, string $key, mixed $default): mixed
     {
         $data = $this->read();
@@ -327,10 +444,76 @@ class Baseline
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $current
+     * @return array<string, mixed>
+     */
+    private function withGateResult(array $data, string $gate, array $current): array
+    {
+        if ($this->profile === 'default') {
+            $resultGroup = $this->normalizeArray(is_array($data['results'] ?? null) ? $data['results'] : []);
+            $this->mergeGateResult($resultGroup, $gate, $current);
+            $data['results'] = $resultGroup;
+
+            return $data;
+        }
+
+        $profiles = $this->normalizeArray(is_array($data['profiles'] ?? null) ? $data['profiles'] : []);
+        $profile = $this->normalizeArray(is_array($profiles[$this->profile] ?? null) ? $profiles[$this->profile] : []);
+        $resultGroup = $this->normalizeArray(is_array($profile['results'] ?? null) ? $profile['results'] : []);
+        $this->mergeGateResult($resultGroup, $gate, $current);
+        $profile['results'] = $resultGroup;
+        $profiles[$this->profile] = $profile;
+        $data['profiles'] = $profiles;
+
+        return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $resultGroup
+     */
+    private function mergeGateResult(array &$resultGroup, string $gate, array $current): void
+    {
+        $existing = $this->normalizeArray(is_array($resultGroup[$gate] ?? null) ? $resultGroup[$gate] : []);
+        $resultGroup[$gate] = array_merge($existing, $current);
+    }
+
+    /**
+     * @param  array<int, string>  $fallback
+     * @return array<int, string>
+     */
+    private function stringList(mixed $value, array $fallback = []): array
+    {
+        if (!is_array($value)) {
+            return $fallback;
+        }
+
+        /** @var array<int, string> $strings */
+        $strings = [];
+        foreach ($value as $item) {
+            if (is_string($item)) {
+                $strings[] = $item;
+            }
+        }
+
+        return $strings !== [] ? $strings : $fallback;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function normalizeArray(array $data): array
     {
-        return array_filter($data, static fn(mixed $key): bool => is_string($key), ARRAY_FILTER_USE_KEY);
+        /** @var array<string, mixed> $normalized */
+        $normalized = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
     }
 }

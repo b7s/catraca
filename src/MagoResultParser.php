@@ -32,6 +32,7 @@ final class MagoResultParser
         }
 
         try {
+            /** @var array{issues?: list<array{message?: mixed, code?: mixed, level?: mixed, annotations?: mixed}>}|mixed $data */
             $data = json_decode(substr($output, $jsonStart), true, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
             return null;
@@ -42,11 +43,9 @@ final class MagoResultParser
         }
 
         $issues = [];
-        foreach ($data['issues'] as $issue) {
-            if (!is_array($issue)) {
-                continue;
-            }
-
+        /** @var list<array{message?: mixed, code?: mixed, level?: mixed, annotations?: mixed}> $issuesRaw */
+        $issuesRaw = $data['issues'];
+        foreach ($issuesRaw as $issue) {
             [$file, $line] = self::location($issue);
             $issues[] = [
                 'file' => $file,
@@ -63,22 +62,23 @@ final class MagoResultParser
     /** @return array{0: string, 1: int} */
     private static function location(array $issue): array
     {
+        /** @var array<int, array{span?: mixed}> $annotations */
         $annotations = $issue['annotations'] ?? [];
-        if (!is_array($annotations)) {
-            return ['unknown', 0];
-        }
-
         foreach ($annotations as $annotation) {
             if (!is_array($annotation)) {
                 continue;
             }
 
+            /** @var array{span?: mixed} $annotation */
             $span = $annotation['span'] ?? [];
-            $fileId = is_array($span) ? $span['file_id'] ?? [] : [];
-            $start = is_array($span) ? $span['start'] ?? [] : [];
-            if (!is_array($fileId) || !is_array($start)) {
+            if (!is_array($span)) {
                 continue;
             }
+
+            /** @var array{name?: mixed, path?: mixed} $fileId */
+            $fileId = $span['file_id'] ?? [];
+            /** @var array{line?: mixed} $start */
+            $start = $span['start'] ?? [];
 
             $file = is_string($fileId['name'] ?? null)
                 ? $fileId['name']

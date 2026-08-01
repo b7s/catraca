@@ -30,7 +30,7 @@ class GithubFormatter
                 Status::Fail => '✘',
                 Status::Warn => '⚠',
                 Status::Skip => '—',
-                Status::Cancelled => '�',
+                Status::Cancelled => '�',
             };
 
             $annotationLevel = match ($gate->status) {
@@ -83,7 +83,9 @@ class GithubFormatter
      */
     private function annotateDetails(array &$lines, GateResult $gate, string $annotationLevel): void
     {
-        $errors = $gate->details['errors'] ?? $gate->details['clones'] ?? $gate->details['oversized'] ?? [];
+        /** @var mixed $details */
+        $details = $gate->details;
+        $errors = $details['errors'] ?? $details['clones'] ?? $details['oversized'] ?? [];
         if (!is_array($errors)) {
             return;
         }
@@ -91,10 +93,16 @@ class GithubFormatter
             if (!is_array($detail)) {
                 continue;
             }
-            $file = $detail['file'] ?? null;
-            $line = $detail['line'] ?? 0;
-            $message = $detail['message'] ?? $detail['file'] ?? '';
-            if (is_string($file) && is_int($line) && is_string($message)) {
+            /** @var mixed $fileRaw */
+            $fileRaw = $detail['file'] ?? null;
+            /** @var mixed $lineRaw */
+            $lineRaw = $detail['line'] ?? 0;
+            /** @var mixed $messageRaw */
+            $messageRaw = $detail['message'] ?? $detail['file'] ?? '';
+            $file = is_string($fileRaw) ? $fileRaw : null;
+            $line = is_int($lineRaw) ? $lineRaw : 0;
+            $message = is_string($messageRaw) ? $messageRaw : '';
+            if ($file !== null && is_int($line) && is_string($message)) {
                 $lines[] = sprintf('::%s file=%s,line=%d::%s', $annotationLevel, $file, $line, $message);
             }
         }

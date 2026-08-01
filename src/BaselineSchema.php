@@ -47,14 +47,18 @@ final class BaselineSchema
                     'internal_error' => 'fail',
                 ],
                 'process' => ['timeout_seconds' => 1200],
-                'mago' => [
-                    'enabled' => true,
-                    'format' => true,
-                    'analyze' => true,
-                    'lint' => true,
-                    'threads' => 0,
-                    'minimum_report_level' => 'warning',
-                    'version' => GateToolRegistry::MAGO_VERSION,
+                'tools' => [
+                    'format' => GateToolRegistry::DEFAULT,
+                    'analyze' => GateToolRegistry::DEFAULT,
+                    'coverage' => GateToolRegistry::DEFAULT,
+                    'lint' => GateToolRegistry::DEFAULT,
+                    'options' => [
+                        'mago' => [
+                            'threads' => 0,
+                            'minimum_report_level' => 'error',
+                            'minimum_version' => GateToolRegistry::MINIMUM_MAGO_VERSION,
+                        ],
+                    ],
                 ],
                 'history' => ['enabled' => false, 'retention' => 50],
                 'security' => [
@@ -71,7 +75,6 @@ final class BaselineSchema
                 ],
                 'performance' => [
                     'mode' => 'no_regression',
-                    'tool' => GateToolRegistry::DEFAULT,
                     'rules' => [
                         'global_namespace_import' => true,
                         'no_unused_imports' => true,
@@ -91,9 +94,9 @@ final class BaselineSchema
                     ],
                     'fixers' => ['condition_order' => false],
                 ],
-                'style' => ['mode' => 'no_regression', 'tool' => GateToolRegistry::DEFAULT],
-                'static_analysis' => ['mode' => 'no_regression', 'tool' => GateToolRegistry::DEFAULT],
-                'coverage' => ['mode' => 'no_regression', 'floor' => 85.0, 'tool' => GateToolRegistry::DEFAULT],
+                'style' => ['mode' => 'no_regression'],
+                'static_analysis' => ['mode' => 'no_regression'],
+                'coverage' => ['mode' => 'no_regression', 'floor' => 85.0],
                 'file_size' => ['mode' => 'no_regression', 'max_lines' => 1000],
                 'complexity' => ['mode' => 'no_regression', 'block_at' => 50, 'warn_at' => 20],
                 'parallel' => [
@@ -126,28 +129,51 @@ final class BaselineSchema
         if (is_array($data['config'] ?? null) && is_array($data['results'] ?? null)) {
             $data['schema'] = Baseline::SCHEMA;
 
-            return $data;
+            return ToolConfigMigrator::migrate($data);
         }
 
-        $normalized = ['schema' => Baseline::SCHEMA, 'config' => [], 'results' => []];
+        $config = [];
+        $results = [];
 
         foreach ($data as $section => $values) {
+            if (!is_string($section)) {
+                continue;
+            }
+
             if (in_array($section, ['schema', 'created_at', 'updated_at'], true)) {
                 continue;
             }
 
             if (!is_array($values)) {
-                $normalized['config'][$section] = $values;
-
+                $config[$section] = $values;
                 continue;
             }
 
             $resultKeys = self::RESULT_KEYS[$section] ?? [];
+            $sectionConfig = [];
+            $sectionResults = [];
             foreach ($values as $key => $value) {
-                $group = is_string($key) && in_array($key, $resultKeys, true) ? 'results' : 'config';
-                $normalized[$group][$section][$key] = $value;
+                if (!is_string($key)) {
+                    continue;
+                }
+
+                if (in_array($key, $resultKeys, true)) {
+                    $sectionResults[$key] = $value;
+                    continue;
+                }
+
+                $sectionConfig[$key] = $value;
+            }
+
+            if ($sectionConfig !== []) {
+                $config[$section] = $sectionConfig;
+            }
+            if ($sectionResults !== []) {
+                $results[$section] = $sectionResults;
             }
         }
+
+        $normalized = ['schema' => Baseline::SCHEMA, 'config' => $config, 'results' => $results];
 
         foreach (['created_at', 'updated_at'] as $key) {
             if (is_string($data[$key] ?? null)) {
@@ -155,7 +181,7 @@ final class BaselineSchema
             }
         }
 
-        return $normalized;
+        return ToolConfigMigrator::migrate($normalized);
     }
 
     /**
@@ -172,11 +198,27 @@ final class BaselineSchema
                 continue;
             }
 
-            if (is_array($default) && is_array($existing[$key])) {
-                $existing[$key] = self::mergeDefaults($existing[$key], $default);
+            $current = $existing[$key] ?? null;
+            if (is_array($default) && is_array($current)) {
+                $existing[$key] = self::mergeDefaults(self::object($current), self::object($default));
             }
         }
 
         return $existing;
+    }
+
+    /** @return array<string, mixed> */
+    private static function object(array $value): array
+    {
+        $result = [];
+        foreach ($value as $key => $item) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $result[$key] = $item;
+        }
+
+        return $result;
     }
 }

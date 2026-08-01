@@ -7,6 +7,7 @@ namespace B7S\Catraca\Command;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\Catraca;
 use B7S\Catraca\GateToolRegistry;
+use B7S\Catraca\MagoVersionChecker;
 use B7S\Catraca\SourcePathResolver;
 use B7S\Catraca\ToolResolver;
 use Parallite\ForkExecutor;
@@ -35,6 +36,8 @@ final class DoctorCommand extends ProjectCommand
     ): int {
         $baseline = new Baseline($projectRoot, profile: $this->stringOption($input, 'profile') ?? 'default');
         $resolver = new ToolResolver($projectRoot);
+        $magoPath = $resolver->resolve('mago');
+        $magoVersion = $magoPath === null ? null : (new MagoVersionChecker())->detect($magoPath, $projectRoot);
         $rows = [
             ['PHP', PHP_VERSION, 'available'],
             [
@@ -43,9 +46,16 @@ final class DoctorCommand extends ProjectCommand
                 ForkExecutor::isAvailable() ? 'available' : 'sequential fallback',
             ],
             [
-                'Mago target',
-                (string) $baseline->getConfig('mago', 'version', GateToolRegistry::MAGO_VERSION),
+                'Mago minimum',
+                $baseline->getMagoMinimumVersion(),
                 'preferred v2 backend',
+            ],
+            [
+                'Mago installed',
+                $magoVersion ?? 'not detected',
+                $magoVersion !== null && MagoVersionChecker::satisfies($magoVersion, $baseline->getMagoMinimumVersion())
+                    ? 'compatible'
+                    : 'missing or too old',
             ],
             ['Mago threads/process', (string) $baseline->getMagoThreads(), 'shared CPU budget'],
             [

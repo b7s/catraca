@@ -90,14 +90,18 @@ class DuplicationGate implements GateInterface
         foreach ($matches as $m) {
             $fileA = $this->relativePath($m[1], $root);
             $fileB = $this->relativePath($m[4], $root);
-            $lineCount = (int) ($m[3] - $m[2] + 1);
+            $startA = (int) $m[2];
+            $endA = (int) $m[3];
+            $startB = (int) $m[5];
+            $endB = (int) $m[6];
+            $lineCount = $endA - $startA + 1;
 
             $cloneDetails[] = [
-                'file_a' => $fileA . ':' . $m[2] . '-' . $m[3],
-                'file_b' => $fileB . ':' . $m[5] . '-' . $m[6],
+                'file_a' => $fileA . ':' . $startA . '-' . $endA,
+                'file_b' => $fileB . ':' . $startB . '-' . $endB,
                 'lines' => $lineCount,
             ];
-            $clones[] = sprintf('%s:%s-%s <-> %s:%s-%s', $fileA, $m[2], $m[3], $fileB, $m[5], $m[6]);
+            $clones[] = sprintf('%s:%d-%d <-> %s:%d-%d', $fileA, $startA, $endA, $fileB, $startB, $endB);
         }
 
         $cloneCount = count($clones);
@@ -134,26 +138,26 @@ class DuplicationGate implements GateInterface
 
     private function getBaselineDup(Baseline $baseline): float
     {
-        if ($baseline->getConfig('duplication', 'mode', 'no_regression') === 'absolute') {
-            $maximum = $baseline->getConfig('duplication', 'max_percentage', 0.0);
+        if ($baseline->getStringConfig('duplication', 'mode', 'no_regression') === 'absolute') {
+            $maximum = $baseline->getFloatConfig('duplication', 'max_percentage', 0.0);
 
             return is_numeric($maximum) ? (float) $maximum : 0.0;
         }
-        $val = $baseline->getResult('duplication', 'percentage', self::DUPLICATION_PERCENT);
+        $val = $baseline->getFloatResult('duplication', 'percentage', self::DUPLICATION_PERCENT);
 
         return is_numeric($val) ? (float) $val : self::DUPLICATION_PERCENT;
     }
 
     private function getBaselineMinLines(Baseline $baseline): int
     {
-        $val = $baseline->getConfig('duplication', 'min_lines', self::DUPLICATION_MIN_LINE);
+        $val = $baseline->getIntConfig('duplication', 'min_lines', self::DUPLICATION_MIN_LINE);
 
         return is_int($val) ? $val : self::DUPLICATION_MIN_LINE;
     }
 
     private function getBaselineMinTokens(Baseline $baseline): int
     {
-        $val = $baseline->getConfig('duplication', 'min_tokens', self::DUPLICATION_MIN_TOKENS);
+        $val = $baseline->getIntConfig('duplication', 'min_tokens', self::DUPLICATION_MIN_TOKENS);
 
         return is_int($val) ? $val : self::DUPLICATION_MIN_TOKENS;
     }

@@ -60,6 +60,7 @@ class ComplexityGate implements GateInterface
         if (file_exists($jsonPath)) {
             $content = file_get_contents($jsonPath);
             if (is_string($content)) {
+                /** @var mixed $decoded */
                 $decoded = json_decode($content, true);
                 $data = is_array($decoded) ? $decoded : null;
             }
@@ -83,6 +84,7 @@ class ComplexityGate implements GateInterface
         $maxCcn = 0;
 
         if ($data !== null) {
+            /** @var array<string, mixed> $data */
             $classes = $data['classes'] ?? [];
             if (is_array($classes)) {
                 /** @var array<string, mixed> $classes */
@@ -94,6 +96,7 @@ class ComplexityGate implements GateInterface
                     $data,
                 ]);
             }
+            /** @var array<string, mixed> $data */
             $files = $data['files'] ?? [];
             if (is_array($files)) {
                 /** @var array<string, mixed> $files */
@@ -107,16 +110,9 @@ class ComplexityGate implements GateInterface
             }
         }
 
-        $baselineMaxCcn = $baseline->getResult('complexity', 'max_ccn', 0);
-        if (!is_int($baselineMaxCcn)) {
-            $baselineMaxCcn = 0;
-        }
-        $blockAt = is_int($baseline->getConfig('complexity', 'block_at', self::BLOCK_AT))
-            ? $baseline->getConfig('complexity', 'block_at', self::BLOCK_AT)
-            : self::BLOCK_AT;
-        $warnAt = is_int($baseline->getConfig('complexity', 'warn_at', self::WARN_AT))
-            ? $baseline->getConfig('complexity', 'warn_at', self::WARN_AT)
-            : self::WARN_AT;
+        $baselineMaxCcn = $baseline->getIntResult('complexity', 'max_ccn', 0);
+        $blockAt = $baseline->getIntConfig('complexity', 'block_at', self::BLOCK_AT);
+        $warnAt = $baseline->getIntConfig('complexity', 'warn_at', self::WARN_AT);
 
         $status = Status::Pass;
         $actions = null;
@@ -169,6 +165,7 @@ class ComplexityGate implements GateInterface
      * @param  callable(mixed $key, mixed $methodData): array{string, mixed}  $extractNameAndData
      */
     private function extractMethods(
+        /** @param array<string, mixed> $items */
         array $items,
         array &$violations,
         array &$warnings,
@@ -179,10 +176,9 @@ class ComplexityGate implements GateInterface
             if (!is_array($itemData)) {
                 continue;
             }
-            $methods = $itemData['methods'] ?? [];
-            if (!is_array($methods)) {
-                continue;
-            }
+            /** @var mixed $methodsRaw */
+            $methodsRaw = $itemData['methods'] ?? [];
+            $methods = is_array($methodsRaw) ? $methodsRaw : [];
             foreach ($methods as $methodKey => $methodData) {
                 [$name, $data] = $extractNameAndData($methodKey, $methodData);
                 $this->processMethod($key, $name, $data, $violations, $warnings, $maxCcn);

@@ -7,6 +7,7 @@ namespace B7S\Catraca\Command;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\Catraca;
 use B7S\Catraca\GateToolRegistry;
+use B7S\Catraca\MagoVersionChecker;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -16,6 +17,7 @@ use Throwable;
 use function in_array;
 use function is_array;
 use function is_int;
+use function is_string;
 
 #[AsCommand(name: 'config:validate', description: 'Validate the Catraca baseline and configuration schema')]
 final class ConfigValidateCommand extends ProjectCommand
@@ -65,7 +67,13 @@ final class ConfigValidateCommand extends ProjectCommand
             return Command::FAILURE;
         }
 
-        $magoLevel = $baseline->getConfig('mago', 'minimum_report_level', 'warning');
+        $tools = is_array($data['config']['tools'] ?? null) ? $data['config']['tools'] : [];
+        $options = is_array($tools['options'] ?? null) ? $tools['options'] : [];
+        $magoOptions = is_array($options['mago'] ?? null) ? $options['mago'] : [];
+
+        /** @var mixed $magoLevelRaw */
+        $magoLevelRaw = $magoOptions['minimum_report_level'] ?? 'error';
+        $magoLevel = is_string($magoLevelRaw) ? $magoLevelRaw : 'error';
         if (!in_array($magoLevel, ['help', 'note', 'warning', 'error'], true)) {
             $output->writeln(
                 '<error>Invalid mago minimum_report_level: expected help, note, warning, or error.</error>',
@@ -74,7 +82,22 @@ final class ConfigValidateCommand extends ProjectCommand
             return Command::FAILURE;
         }
 
-        $magoThreads = $baseline->getConfig('mago', 'threads', 0);
+        /** @var mixed $minimumMagoVersionRaw */
+        $minimumMagoVersionRaw = $magoOptions['minimum_version'] ?? GateToolRegistry::MINIMUM_MAGO_VERSION;
+        $minimumMagoVersion = is_string($minimumMagoVersionRaw)
+            ? $minimumMagoVersionRaw
+            : GateToolRegistry::MINIMUM_MAGO_VERSION;
+        if (!is_string($minimumMagoVersion) || !MagoVersionChecker::isValid($minimumMagoVersion)) {
+            $output->writeln(
+                '<error>Invalid mago minimum_version: expected a semantic version such as 1.45.0.</error>',
+            );
+
+            return Command::FAILURE;
+        }
+
+        /** @var mixed $magoThreadsRaw */
+        $magoThreadsRaw = $magoOptions['threads'] ?? 0;
+        $magoThreads = is_int($magoThreadsRaw) ? $magoThreadsRaw : 0;
         if (!is_int($magoThreads) || $magoThreads < 0 || $magoThreads > 128) {
             $output->writeln('<error>Invalid mago threads: expected an integer from 0 (automatic) to 128.</error>');
 

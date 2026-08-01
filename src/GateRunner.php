@@ -157,7 +157,7 @@ class GateRunner
             return $this->errorResult($gateDef['name'], $data);
         }
 
-        if (!is_array($data)) {
+        if (!is_array($data) || !GateResult::isSerializedData($data)) {
             return new GateResult(
                 status: Status::Skip,
                 name: 'unknown',
@@ -166,6 +166,19 @@ class GateRunner
             );
         }
 
+        /**
+         * @var array{
+         *     status: string,
+         *     name: string,
+         *     label: string,
+         *     message: string,
+         *     severity: string,
+         *     baseline?: array<string, mixed>|null,
+         *     current?: array<string, mixed>|null,
+         *     actions?: array<int, array{type: string, message: string, files?: array<int, string>, reasons?: array<int, string>}>|null,
+         *     details?: array<string, mixed>|null
+         * } $data
+         */
         return (new GatePolicyEvaluator())->evaluate(GateResult::fromArray($data), $this->baseline);
     }
 

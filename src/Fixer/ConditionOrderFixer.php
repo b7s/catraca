@@ -38,7 +38,10 @@ readonly class ConditionOrderFixer implements FixerInterface
     private function clearOrigNode(Node $node): void
     {
         $node->setAttribute('origNode', null);
-        foreach ($node->getSubNodeNames() as $name) {
+        /** @var array<string, string> $subNodeNames */
+        $subNodeNames = $node->getSubNodeNames();
+        foreach ($subNodeNames as $name) {
+            /** @var mixed $sub */
             $sub = $node->$name;
             if (is_array($sub)) {
                 foreach ($sub as $item) {

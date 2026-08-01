@@ -141,6 +141,10 @@ readonly class StyleGate implements GateInterface
         return $this->buildStyleResult($result['violations'], $result['files'], $baseline, toolName: 'PHP CS Fixer');
     }
 
+    /**
+     * @param  array<int, string>  $files
+     * @param  array<string, mixed>|null  $details
+     */
     private function buildStyleResult(
         int $violations,
         array $files,

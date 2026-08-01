@@ -21,7 +21,7 @@
         "symfony/process": "^6.4 || ^7.0 || ^8.0"
     },
     "require-dev": {
-        "carthage-software/mago": "1.45.0",
+        "carthage-software/mago": ">=1.45.0",
         "friendsofphp/php-cs-fixer": "^3.95",
         "laravel/pint": "^1.29",
         "phpmetrics/phpmetrics": "^2.9",

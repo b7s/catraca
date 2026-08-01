@@ -123,8 +123,18 @@ final class BaselineStore
         }
 
         $data = json_decode($content, true);
+        if (!is_array($data)) {
+            return null;
+        }
 
-        return is_array($data) && $data !== [] ? $data : null;
+        $normalized = [];
+        foreach ($data as $key => $value) {
+            if (is_string($key)) {
+                $normalized[$key] = $value;
+            }
+        }
+
+        return $normalized !== [] ? $normalized : null;
     }
 
     /**

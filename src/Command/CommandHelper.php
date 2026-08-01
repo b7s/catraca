@@ -26,6 +26,7 @@ use B7S\Catraca\ProjectResolver;
 use B7S\Catraca\RunHistoryStore;
 use B7S\Catraca\ToolResolver;
 use JsonException;
+use LogicException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -75,7 +76,9 @@ trait CommandHelper
         }
 
         $profile = $this->stringOption($input, 'profile') ?? 'default';
+        /** @var string|null $changedFrom */
         $changedFrom = $this->stringOption($input, 'changed-from');
+        /** @var mixed $timeout */
         $timeout = $input->getOption('timeout');
 
         $catraca = new Catraca(
@@ -84,12 +87,12 @@ trait CommandHelper
             changedFrom: $changedFrom,
             timeoutOverride: is_numeric($timeout) ? (int) $timeout : null,
         );
-        $this->setActiveCatraca($catraca);
+        $this->projectCommand()->setActiveCatraca($catraca);
 
         try {
             return $operation($projectRoot, $catraca);
         } finally {
-            $this->setActiveCatraca(null);
+            $this->projectCommand()->setActiveCatraca(null);
         }
     }
 
@@ -114,36 +117,26 @@ trait CommandHelper
 
     protected function addStandardOptions(): void
     {
-        $this
-            ->addOption('path', 'p', InputOption::VALUE_REQUIRED, 'Project root path', getcwd())
-            ->addOption(
-                'format',
-                'f',
-                InputOption::VALUE_REQUIRED,
-                'Output format: human, json, json-pretty, github, sarif, junit',
-                'human',
-            )
-            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Write formatted output to a file')
-            ->addOption(
-                'profile',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Named configuration and baseline profile',
-                'default',
-            )
-            ->addOption(
-                'changed-from',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Only analyze PHP files changed from this Git reference',
-            )
-            ->addOption('timeout', null, InputOption::VALUE_REQUIRED, 'Override process timeout in seconds')
-            ->addOption('save-run', null, InputOption::VALUE_NONE, 'Persist this run under .catraca/runs')
-            ->addOption('plain', null, InputOption::VALUE_NONE, 'Plain text output (no ANSI colors)');
+        $command = $this->projectCommand();
+        $command->addOption('path', 'p', InputOption::VALUE_REQUIRED, 'Project root path', getcwd());
+        $command->addOption(
+            'format',
+            'f',
+            InputOption::VALUE_REQUIRED,
+            'Output format: human, json, json-pretty, github, sarif, junit',
+            'human',
+        );
+        $command->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Write formatted output to a file');
+        $command->addOption('profile', null, InputOption::VALUE_REQUIRED, 'Named configuration profile', 'default');
+        $command->addOption('changed-from', null, InputOption::VALUE_REQUIRED, 'Analyze files changed from Git ref');
+        $command->addOption('timeout', null, InputOption::VALUE_REQUIRED, 'Override process timeout in seconds');
+        $command->addOption('save-run', null, InputOption::VALUE_NONE, 'Persist this run under .catraca/runs');
+        $command->addOption('plain', null, InputOption::VALUE_NONE, 'Plain text output (no ANSI colors)');
     }
 
     private function resolveProjectRoot(InputInterface $input, OutputInterface $output): ?string
     {
+        /** @var mixed $pathOption */
         $pathOption = $input->getOption('path');
         $rawPath = is_string($pathOption) ? $pathOption : null;
         $resolver = new ProjectResolver();
@@ -172,7 +165,7 @@ trait CommandHelper
 
     private function isPlainOutput(InputInterface $input, OutputInterface $output): bool
     {
-        return $input->getOption('plain') || !$output->isDecorated();
+        return $input->getOption('plain') === true || !$output->isDecorated();
     }
 
     /**
@@ -231,19 +224,14 @@ trait CommandHelper
     {
         $profile = $this->stringOption($input, 'profile') ?? 'default';
         $baseline = new Baseline($projectRoot, profile: $profile);
-        $enabled = $input->getOption('save-run') || $baseline->getConfig('history', 'enabled', false) === true;
+        $enabled = $input->getOption('save-run') === true || $baseline->getBoolConfig('history', 'enabled', false);
         if (!$enabled) {
             return null;
         }
 
-        $retention = $baseline->getConfig('history', 'retention', 50);
+        $retention = $baseline->getIntConfig('history', 'retention', 50);
 
-        return (new RunHistoryStore())->write(
-            $result,
-            $projectRoot,
-            $profile,
-            is_numeric($retention) ? (int) $retention : 50,
-        );
+        return (new RunHistoryStore())->write($result, $projectRoot, $profile, $retention);
     }
 
     protected function stringOption(InputInterface $input, string $name): ?string
@@ -252,6 +240,7 @@ trait CommandHelper
             return null;
         }
 
+        /** @var mixed $value */
         $value = $input->getOption($name);
         if (!is_string($value) || $value === '') {
             return null;
@@ -274,5 +263,11 @@ trait CommandHelper
         }
 
         return new LiveCheckRenderer($output->section(), $catraca->getGateLabels());
+    }
+
+    private function projectCommand(): ProjectCommand
+    {
+        /** @var ProjectCommand $this */
+        return $this;
     }
 }

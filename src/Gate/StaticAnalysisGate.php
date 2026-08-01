@@ -82,6 +82,7 @@ readonly class StaticAnalysisGate implements GateInterface
         $process->run();
 
         $output = $process->getOutput() !== '' ? $process->getOutput() : $process->getErrorOutput();
+        /** @var mixed $data */
         $data = json_decode($output, true);
 
         /** @var array<int, array{file: string, line: int, message: string, ignorable: bool}> $errors */
@@ -92,36 +93,32 @@ readonly class StaticAnalysisGate implements GateInterface
         $totals = ['file_errors' => 0, 'errors' => 0];
 
         if (is_array($data)) {
+            /** @var array<string, mixed> $rawTotals */
             $rawTotals = $data['totals'] ?? [];
-            if (is_array($rawTotals)) {
-                $totals = [
-                    'file_errors' => is_int($rawTotals['file_errors'] ?? null) ? $rawTotals['file_errors'] : 0,
-                    'errors' => is_int($rawTotals['errors'] ?? null) ? $rawTotals['errors'] : 0,
-                ];
-            }
+            $totals = [
+                'file_errors' => is_int($rawTotals['file_errors'] ?? null) ? $rawTotals['file_errors'] : 0,
+                'errors' => is_int($rawTotals['errors'] ?? null) ? $rawTotals['errors'] : 0,
+            ];
 
+            /** @var array<string, mixed> $rawFiles */
             $rawFiles = $data['files'] ?? [];
-            if (is_array($rawFiles)) {
-                foreach ($rawFiles as $filePath => $fileData) {
-                    if (!is_string($filePath) || !is_array($fileData)) {
+            foreach ($rawFiles as $filePath => $fileData) {
+                if (!is_string($filePath) || !is_array($fileData)) {
+                    continue;
+                }
+                /** @var array<int, mixed> $messages */
+                $messages = $fileData['messages'] ?? [];
+                foreach ($messages as $msg) {
+                    if (!is_array($msg)) {
                         continue;
                     }
-                    $messages = $fileData['messages'] ?? [];
-                    if (!is_array($messages)) {
-                        continue;
-                    }
-                    foreach ($messages as $msg) {
-                        if (!is_array($msg)) {
-                            continue;
-                        }
-                        $errors[] = [
-                            'file' => $filePath,
-                            'line' => is_int($msg['line'] ?? null) ? $msg['line'] : 0,
-                            'message' => is_string($msg['message'] ?? null) ? $msg['message'] : '',
-                            'ignorable' => ($msg['ignorable'] ?? true) === true,
-                        ];
-                        $files[] = $filePath . ':' . (is_int($msg['line'] ?? null) ? $msg['line'] : 0);
-                    }
+                    $errors[] = [
+                        'file' => $filePath,
+                        'line' => is_int($msg['line'] ?? null) ? $msg['line'] : 0,
+                        'message' => is_string($msg['message'] ?? null) ? $msg['message'] : '',
+                        'ignorable' => ($msg['ignorable'] ?? true) === true,
+                    ];
+                    $files[] = $filePath . ':' . (is_int($msg['line'] ?? null) ? $msg['line'] : 0);
                 }
             }
         }
@@ -142,6 +139,7 @@ readonly class StaticAnalysisGate implements GateInterface
         $process->run();
 
         $output = $process->getOutput() !== '' ? $process->getOutput() : $process->getErrorOutput();
+        /** @var mixed $data */
         $data = json_decode($output, true);
 
         /** @var array<int, array{file: string, line: int, message: string, severity: string}> $errors */
@@ -182,9 +180,7 @@ readonly class StaticAnalysisGate implements GateInterface
         Baseline $baseline,
         string $toolName,
     ): GateResult {
-        $baselineErrors = is_int($baseline->getResult('static_analysis', 'errors', 0))
-            ? $baseline->getResult('static_analysis', 'errors', 0)
-            : 0;
+        $baselineErrors = $baseline->getIntResult('static_analysis', 'errors', 0);
 
         $status = Status::Pass;
         $actions = null;

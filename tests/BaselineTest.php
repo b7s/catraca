@@ -53,10 +53,11 @@ final class BaselineTest extends TestCase
         self::assertSame('catraca/v2', $data['schema']);
         self::assertSame(3, $data['config']['duplication']['min_lines']);
         self::assertSame(1200.0, $baseline->getGateTimeout('coverage'));
-        self::assertSame('1.45.0', $data['config']['mago']['version']);
+        self::assertSame('1.45.0', $data['config']['tools']['options']['mago']['minimum_version']);
+        self::assertSame('error', $data['config']['tools']['options']['mago']['minimum_report_level']);
+        self::assertArrayNotHasKey('mago', $data['config']);
         self::assertSame('auto', $baseline->getGateTool('style'));
         self::assertSame(['mago', 'pint', 'php-cs-fixer'], GateToolRegistry::candidates($baseline, 'style'));
-        self::assertTrue($baseline->isMagoEnabled('analyze'));
         self::assertSame(1, $baseline->getMagoThreads());
         self::assertSame(0.0, $data['results']['duplication']['percentage']);
         self::assertArrayNotHasKey('percentage', $data['config']['duplication']);
@@ -163,6 +164,39 @@ final class BaselineTest extends TestCase
         self::assertSame(85, $data['results']['coverage']['percentage']);
         self::assertSame(72.5, $data['profiles']['api']['results']['coverage']['percentage']);
         self::assertSame(72.5, $profile->getResult('coverage', 'percentage'));
+    }
+
+    public function test_migrates_legacy_gate_tools_to_generic_operations(): void
+    {
+        $baseline = new Baseline($this->tmpDir);
+        $baseline->write([
+            'config' => [
+                'style' => ['tool' => 'Pint', 'mode' => 'no_regression'],
+                'static_analysis' => ['tool' => 'Psalm'],
+                'mago' => [
+                    'version' => '1.45.0',
+                    'threads' => 2,
+                    'minimum_report_level' => 'warning',
+                ],
+            ],
+            'results' => [],
+        ]);
+
+        $baseline->init();
+
+        $data = $this->readJson($baseline->getPath());
+        self::assertIsArray($data['config']);
+        $config = $data['config'];
+        self::assertIsArray($config['tools']);
+        $tools = $config['tools'];
+        self::assertSame('pint', $tools['format']);
+        self::assertSame('psalm', $tools['analyze']);
+        self::assertSame('1.45.0', $tools['options']['mago']['minimum_version']);
+        self::assertSame(2, $tools['options']['mago']['threads']);
+        self::assertSame('warning', $tools['options']['mago']['minimum_report_level']);
+        self::assertArrayNotHasKey('mago', $config);
+        self::assertArrayNotHasKey('tool', $config['style']);
+        self::assertArrayNotHasKey('tool', $config['static_analysis']);
     }
 
     /**
