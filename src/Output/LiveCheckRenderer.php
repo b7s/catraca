@@ -112,10 +112,10 @@ final class LiveCheckRenderer implements GateRunObserverInterface
     {
         [$icon, $style] = match ($result->status) {
             Status::Pass => ['✔', 'info'],
-            Status::Fail => ['🚫', 'error'],
+            Status::Fail => ['⛔', 'error'],
             Status::Warn => ['⚠', 'comment'],
             Status::Skip => ['—', 'fg=gray'],
-            Status::Cancelled => ['�', 'error'],
+            Status::Cancelled => ['⊘', 'error'],
         };
 
         return [

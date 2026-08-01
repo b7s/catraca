@@ -135,10 +135,10 @@ class HumanFormatter
     {
         return match ($gate->status) {
             Status::Pass => "\e[32m✔\e[0m",
-            Status::Fail => "\e[31m🚫\e[0m",
+            Status::Fail => "\e[31m⛔\e[0m",
             Status::Warn => "\e[33m⚠\e[0m",
             Status::Skip => "\e[90m—\e[0m",
-            Status::Cancelled => "\e[31m�\e[0m",
+            Status::Cancelled => "\e[31m⊘\e[0m",
         };
     }
 }

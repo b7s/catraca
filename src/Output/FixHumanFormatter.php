@@ -68,6 +68,6 @@ class FixHumanFormatter
             return "\e[90m—\e[0m";
         }
 
-        return "\e[31m🚫\e[0m";
+        return "\e[31m⛔\e[0m";
     }
 }
