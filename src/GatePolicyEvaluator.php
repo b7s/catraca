@@ -51,9 +51,10 @@ final readonly class GatePolicyEvaluator
             );
         }
 
-        $modeValue = $baseline->getConfig($result->name, 'mode', PolicyMode::NoRegression->value);
-        $mode = is_string($modeValue) ? PolicyMode::tryFrom($modeValue) : null;
-        $mode ??= PolicyMode::NoRegression;
+        $mode = $this->resolveMode($baseline, $result->name);
+        if ($mode === PolicyMode::Skip) {
+            return $this->withStatus($result, Status::Skip);
+        }
 
         if ($mode === PolicyMode::Absolute) {
             return $result;
@@ -76,6 +77,14 @@ final readonly class GatePolicyEvaluator
             : (float) $current > (float) $baselineValue;
 
         return $this->withStatus($result, $regressed ? Status::Fail : Status::Pass);
+    }
+
+    private function resolveMode(Baseline $baseline, string $gate): PolicyMode
+    {
+        $modeValue = $baseline->getConfig($gate, 'mode', PolicyMode::NoRegression->value);
+        $mode = is_string($modeValue) ? PolicyMode::tryFrom($modeValue) : null;
+
+        return $mode ?? PolicyMode::NoRegression;
     }
 
     private function failureStatus(mixed $policy): Status

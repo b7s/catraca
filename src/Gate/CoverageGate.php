@@ -6,6 +6,7 @@ namespace B7S\Catraca\Gate;
 
 use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\ActionType;
+use B7S\Catraca\Enum\PolicyMode;
 use B7S\Catraca\Enum\Severity;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\GateInterface;
@@ -15,6 +16,7 @@ use B7S\Catraca\ToolResolver;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
+use function is_string;
 use function sprintf;
 
 class CoverageGate implements GateInterface
@@ -23,6 +25,17 @@ class CoverageGate implements GateInterface
 
     public function run(Baseline $baseline, ToolResolver $resolver): GateResult
     {
+        $mode = $this->resolveMode($baseline);
+        if ($mode === PolicyMode::Skip) {
+            return new GateResult(
+                status: Status::Skip,
+                name: 'coverage',
+                label: 'Test Coverage',
+                message: 'Coverage gate disabled (mode: skip)',
+                severity: Severity::Warn,
+            );
+        }
+
         $cwd = $resolver->getProjectRoot();
 
         $tool = GateToolRegistry::resolve($baseline, $resolver, 'coverage');
@@ -37,6 +50,14 @@ class CoverageGate implements GateInterface
             message: 'No test runner found (install phpunit or pest)',
             severity: Severity::Warn,
         );
+    }
+
+    private function resolveMode(Baseline $baseline): PolicyMode
+    {
+        $modeValue = $baseline->getConfig('coverage', 'mode', PolicyMode::NoRegression->value);
+        $mode = is_string($modeValue) ? PolicyMode::tryFrom($modeValue) : null;
+
+        return $mode ?? PolicyMode::NoRegression;
     }
 
     private function runRunner(string $runner, Baseline $baseline, ToolResolver $resolver, string $cwd): GateResult

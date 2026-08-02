@@ -9,4 +9,5 @@ enum PolicyMode: string
     case Absolute = 'absolute';
     case NoRegression = 'no_regression';
     case Informational = 'informational';
+    case Skip = 'skip';
 }
