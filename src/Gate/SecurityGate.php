@@ -47,6 +47,7 @@ readonly class SecurityGate implements GateInterface
         'weak_cryptography' => true,
         'cors_config' => true,
         'npm_audit' => true,
+        'laravel_owasp' => true,
     ];
 
     private const array SUB_CHECK_METHODS = [
@@ -64,6 +65,7 @@ readonly class SecurityGate implements GateInterface
         'weak_cryptography' => 'checkWeakCryptography',
         'cors_config' => 'checkCorsConfig',
         'npm_audit' => 'checkNpmAudit',
+        'laravel_owasp' => 'checkLaravelOwasp',
     ];
 
     public function __construct(
@@ -224,6 +226,7 @@ readonly class SecurityGate implements GateInterface
             'weak_cryptography' => $subCheck->checkWeakCryptography(),
             'cors_config' => $subCheck->checkCorsConfig(),
             'npm_audit' => $subCheck->checkNpmAudit(),
+            'laravel_owasp' => $subCheck->checkLaravelOwasp(),
             default => [],
         });
     }

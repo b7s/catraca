@@ -29,7 +29,15 @@ final class ToolConfigMigratorTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['vendor/bin/mago', 'vendor/bin/pint', 'vendor/bin/phpstan', 'vendor/bin/psalm', 'vendor/bin/pest', 'vendor/bin/phpunit', 'vendor/bin/php-cs-fixer'] as $file) {
+        foreach ([
+            'vendor/bin/mago',
+            'vendor/bin/pint',
+            'vendor/bin/phpstan',
+            'vendor/bin/psalm',
+            'vendor/bin/pest',
+            'vendor/bin/phpunit',
+            'vendor/bin/php-cs-fixer',
+        ] as $file) {
             if (file_exists($this->tmpDir . '/' . $file)) {
                 unlink($this->tmpDir . '/' . $file);
             }
@@ -140,7 +148,11 @@ final class ToolConfigMigratorTest extends TestCase
      */
     private function v1Baseline(?array $tool): array
     {
-        $gateTool = static fn (string $gate): array => $tool === null ? ['mode' => 'no_regression'] : ['tool' => $tool['tool'] ?? 'auto', 'mode' => 'no_regression'];
+        $gateTool = static fn(string $gate): array => (
+            $tool === null
+                ? ['mode' => 'no_regression']
+                : ['tool' => $tool['tool'] ?? 'auto', 'mode' => 'no_regression']
+        );
 
         return [
             'config' => [
@@ -148,7 +160,13 @@ final class ToolConfigMigratorTest extends TestCase
                 'static_analysis' => $gateTool('static_analysis'),
                 'coverage' => $gateTool('coverage'),
                 'performance' => $gateTool('performance'),
-                'mago' => ['enabled' => true, 'format' => true, 'analyze' => true, 'lint' => true, 'version' => '1.45.0'],
+                'mago' => [
+                    'enabled' => true,
+                    'format' => true,
+                    'analyze' => true,
+                    'lint' => true,
+                    'version' => '1.45.0',
+                ],
             ],
             'results' => [],
         ];

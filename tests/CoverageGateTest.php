@@ -7,8 +7,8 @@ namespace B7S\Catraca\Tests;
 use B7S\Catraca\Baseline;
 use B7S\Catraca\Enum\Status;
 use B7S\Catraca\Gate\CoverageGate;
-use B7S\Catraca\GateResult;
 use B7S\Catraca\GatePolicyEvaluator;
+use B7S\Catraca\GateResult;
 use B7S\Catraca\ToolResolver;
 use PHPUnit\Framework\TestCase;
 
@@ -130,7 +130,12 @@ final class CoverageGateTest extends TestCase
                 'file_size' => ['mode' => 'no_regression', 'max_lines' => 1000],
                 'style' => ['mode' => 'no_regression'],
                 'static_analysis' => ['mode' => 'no_regression'],
-                'duplication' => ['mode' => 'no_regression', 'max_percentage' => 0.0, 'min_lines' => 3, 'min_tokens' => 30],
+                'duplication' => [
+                    'mode' => 'no_regression',
+                    'max_percentage' => 0.0,
+                    'min_lines' => 3,
+                    'min_tokens' => 30,
+                ],
                 'performance' => ['mode' => 'no_regression', 'rules' => [], 'fixers' => []],
                 'security' => ['mode' => 'no_regression', 'rules' => [], 'fixers' => [], 'released_days' => 3],
             ],

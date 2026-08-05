@@ -235,6 +235,93 @@ class SecuritySubCheck
         return $findings;
     }
 
+    /**
+     * Laravel-specific OWASP greps: mass-assignment bypasses and dynamic
+     * column-name SQLi identifiers driven by request input. See the docblock
+     * on LARAVEL_OWASP_PATTERNS for the threat model and the explicit
+     * safe-shapes that stay silent.
+     *
+     * Lines that are pure documentation rather than executable PHP are skipped
+     * up-front, so this gate stays silent on its own source (catraca's pattern
+     * definitions) and on every docblock illustration of the threat model:
+     *   - blank lines, double-slash and hash line comments;
+     *   - multi-line docblock continuations (asterisk-prefixed lines);
+     *   - single-line docblocks (a slash-star ... star-slash block on one
+     *     line, optionally wrapped with leading text such as a star-prefixed
+     *     note followed by an inline docblock);
+     *   - regex-literal definitions (lines whose trimmed form starts with a
+     *     single-quoted slash — catraca's own pattern strings, never real
+     *     Laravel code).
+     *
+     * @return array<int, string>
+     */
+    public function checkLaravelOwasp(): array
+    {
+        $findings = [];
+
+        foreach ($this->scanLines($this->paths, self::EXCLUDE_PATHS_WITH_TESTS) as [$pathname, $i, $line]) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '//') || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+
+            // Docblock continuations of a multi-line block.
+            if (str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
+                continue;
+            }
+
+            // Single-line docblock / inline comment on the same line as
+            // real code: "x = 1; legacy-docblock". Strip the inline
+            // comment segment first, then re-test — if anything remains
+            // after stripping all docblocks the line still has executable
+            // code worth scanning.
+            $stripped = $this->stripInlineComments($trimmed);
+            if ($stripped === '') {
+                continue;
+            }
+
+            // catraca's own pattern-definition lines open with a single-quoted
+            // regex literal ("quote-slash-...") never Laravel application code.
+            if (str_starts_with($trimmed, "'/")) {
+                continue;
+            }
+
+            foreach (LaravelOwaspPatterns::PATTERNS as $pattern) {
+                if (!preg_match($pattern, $stripped)) {
+                    continue;
+                }
+
+                $findings[] = $this->fmt($this->root, $pathname, $i, $line, LaravelOwaspPatterns::labelFor($pattern));
+                break;
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Remove every inline comment segment (a slash-star ... star-slash block,
+     * including single-line docblocks) from a line, returning whatever
+     * non-comment text remains. Used by checkLaravelOwasp so a docblock on the
+     * same line as real code is stripped before the security grep runs — e.g.
+     * an illustrative docblock trailing an executable statement must not trip
+     * the gate while the real code portion still gets scanned.
+     */
+    private function stripInlineComments(string $line): string
+    {
+        // Repeatedly strip inline-comment blocks (non-greedy, span the rest of
+        // the line) until none remain — handles multiple trailing docblocks
+        // such as "x = 1; legacy-docblock; another-docblock".
+        $previous = '';
+        $current = $line;
+        while ($previous !== $current) {
+            $previous = $current;
+            $current = (string) preg_replace('#/\*(?:[^*]|\*(?!/))*\*/#s', '', $current);
+        }
+
+        return trim($current);
+    }
+
     public function checkCommandInjection(): array
     {
         $findings = [];

@@ -16,7 +16,8 @@
                 "package_freshness": false,
                 "weak_cryptography": true,
                 "cors_config": true,
-                "npm_audit": true
+                "npm_audit": true,
+                "laravel_owasp": true
             },
             "fixers": [],
             "released_days": 3,
@@ -135,5 +136,5 @@
             "violations": 0
         }
     },
-    "updated_at": "2026-08-02T02:49:25+00:00"
+    "updated_at": "2026-08-05T19:23:33+00:00"
 }
