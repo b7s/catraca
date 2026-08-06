@@ -407,6 +407,63 @@ final class SecuritySubCheckTest extends TestCase
         return $sub->checkLaravelOwasp();
     }
 
+    public function test_gitleaks_returns_no_findings_on_a_clean_directory(): void
+    {
+        $sub = new SecuritySubCheck($this->tmpDir, [$this->tmpDir]);
+
+        $findings = $sub->checkGitleaks();
+
+        $this->assertSame([], $findings);
+    }
+
+    public function test_gitleaks_detects_a_hardcoded_aws_key_when_installed(): void
+    {
+        if (!$this->gitleaksAvailable()) {
+            $this->markTestSkipped('gitleaks binary is not installed');
+        }
+
+        $this->write('app/Config/secrets.php', <<<'PHP'
+            <?php
+            return [
+                'aws_key' => 'AKIAIOSFODNN7EXAMPLE',
+            ];
+            PHP);
+
+        $sub = new SecuritySubCheck($this->tmpDir, [$this->tmpDir]);
+
+        $findings = $sub->checkGitleaks();
+
+        $this->assertNotEmpty($findings);
+        $this->assertStringContainsString('secrets.php', $findings[0]);
+        $this->assertStringContainsString('gitleaks:', $findings[0]);
+    }
+
+    public function test_gitleaks_filters_findings_under_vendor_paths(): void
+    {
+        if (!$this->gitleaksAvailable()) {
+            $this->markTestSkipped('gitleaks binary is not installed');
+        }
+
+        $this->write('vendor/acme/package/Config.php', <<<'PHP'
+            <?php
+            return ['aws_key' => 'AKIAIOSFODNN7EXAMPLE'];
+            PHP);
+
+        $sub = new SecuritySubCheck($this->tmpDir, [$this->tmpDir]);
+
+        $findings = $sub->checkGitleaks();
+
+        $this->assertSame([], $findings);
+    }
+
+    private function gitleaksAvailable(): bool
+    {
+        $which = new \Symfony\Component\Process\Process(['which', 'gitleaks']);
+        $which->run();
+
+        return $which->isSuccessful() && trim($which->getOutput()) !== '';
+    }
+
     private function write(string $relative, string $content): void
     {
         $path = $this->tmpDir . '/' . $relative;

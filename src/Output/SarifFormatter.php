@@ -36,21 +36,39 @@ final readonly class SarifFormatter
             $findings[] = $finding;
         }
 
+        $run = [
+            'tool' => ['driver' => [
+                'name' => 'Catraca',
+                'informationUri' => 'https://github.com/b7s/catraca',
+                'rules' => array_map(static fn($gate): array => [
+                    'id' => 'catraca.' . $gate->name,
+                    'shortDescription' => ['text' => $gate->label],
+                ], $result->getGates()),
+            ]],
+            'results' => $findings,
+        ];
+
+        $time = $result->getTime();
+        $memory = $result->getMemory();
+        if ($time !== null || $memory !== null) {
+            $properties = [];
+            if ($time !== null) {
+                $properties['time'] = $time;
+            }
+            if ($memory !== null) {
+                $properties['memory'] = $memory;
+            }
+            $run['invocations'] = [[
+                'executionSuccessful' => $result->isPass(),
+                'properties' => $properties,
+            ]];
+        }
+
         return json_encode(
             [
                 'version' => '2.1.0',
                 '$schema' => 'https://json.schemastore.org/sarif-2.1.0.json',
-                'runs' => [[
-                    'tool' => ['driver' => [
-                        'name' => 'Catraca',
-                        'informationUri' => 'https://github.com/b7s/catraca',
-                        'rules' => array_map(static fn($gate): array => [
-                            'id' => 'catraca.' . $gate->name,
-                            'shortDescription' => ['text' => $gate->label],
-                        ], $result->getGates()),
-                    ]],
-                    'results' => $findings,
-                ]],
+                'runs' => [$run],
             ],
             JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
         ) . "\n";

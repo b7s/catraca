@@ -48,6 +48,7 @@ readonly class SecurityGate implements GateInterface
         'cors_config' => true,
         'npm_audit' => true,
         'laravel_owasp' => true,
+        'gitleaks' => true,
     ];
 
     private const array SUB_CHECK_METHODS = [
@@ -66,6 +67,7 @@ readonly class SecurityGate implements GateInterface
         'cors_config' => 'checkCorsConfig',
         'npm_audit' => 'checkNpmAudit',
         'laravel_owasp' => 'checkLaravelOwasp',
+        'gitleaks' => 'checkGitleaks',
     ];
 
     public function __construct(
@@ -227,6 +229,7 @@ readonly class SecurityGate implements GateInterface
             'cors_config' => $subCheck->checkCorsConfig(),
             'npm_audit' => $subCheck->checkNpmAudit(),
             'laravel_owasp' => $subCheck->checkLaravelOwasp(),
+            'gitleaks' => $subCheck->checkGitleaks(),
             default => [],
         });
     }

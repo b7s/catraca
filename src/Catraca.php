@@ -62,11 +62,14 @@ class Catraca
 
     public function init(?GateRunObserverInterface $observer = null): CheckResult
     {
+        $start = hrtime(true);
         $result = new CheckResult();
 
         $this->baseline->init();
         $this->runGates($result, $observer);
         $this->writeBaseline($result);
+
+        $result->setMetrics((int) (hrtime(true) - $start), memory_get_peak_usage(true));
 
         return $result;
     }
@@ -75,8 +78,11 @@ class Catraca
     {
         $this->baseline->init();
 
+        $start = hrtime(true);
         $result = new CheckResult();
         $this->runGates($result, $observer);
+
+        $result->setMetrics((int) (hrtime(true) - $start), memory_get_peak_usage(true));
 
         return $result;
     }

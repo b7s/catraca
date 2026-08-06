@@ -884,6 +884,20 @@ class SecuritySubCheck
         return $findings;
     }
 
+    /**
+     * Scans the repository for hardcoded secrets using gitleaks (git-aware,
+     * cross-language secret scanner). Skipped silently when the gitleaks binary
+     * is not installed, matching the optional-tool policy. Delegates to
+     * GitleaksScanner, which filters standard noise paths (vendor, node_modules,
+     * storage, .git, bootstrap/cache) out of the findings.
+     *
+     * @return array<int, string>
+     */
+    public function checkGitleaks(): array
+    {
+        return (new GitleaksScanner($this->root))->scan();
+    }
+
     private function sensitiveFileExists(string $pattern): bool
     {
         if (str_starts_with($pattern, '*')) {

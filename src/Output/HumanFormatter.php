@@ -111,6 +111,13 @@ class HumanFormatter
             $result->getPassedCount(),
             count($result->getGates()),
         );
+
+        $time = $result->getTime();
+        $memory = $result->getMemory();
+        if ($time !== null && $memory !== null) {
+            $lines[] = sprintf(' TIME: %s — MEMORY: %s', $time, $memory);
+        }
+
         $lines[] = '';
 
         $actions = $result->getActions();

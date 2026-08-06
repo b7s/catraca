@@ -22,6 +22,19 @@ final readonly class JunitFormatter
             $result->getSkippedCount(),
         )];
 
+        $time = $result->getTime();
+        $memory = $result->getMemory();
+        if ($time !== null || $memory !== null) {
+            $lines[] = '  <properties>';
+            if ($time !== null) {
+                $lines[] = sprintf('    <property name="time" value="%s"/>', htmlspecialchars($time, ENT_XML1));
+            }
+            if ($memory !== null) {
+                $lines[] = sprintf('    <property name="memory" value="%s"/>', htmlspecialchars($memory, ENT_XML1));
+            }
+            $lines[] = '  </properties>';
+        }
+
         foreach ($result->getGates() as $gate) {
             $lines[] = sprintf('  <testcase classname="catraca" name="%s">', htmlspecialchars($gate->label, ENT_XML1));
 

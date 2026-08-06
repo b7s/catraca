@@ -65,7 +65,7 @@ composer require --dev systemsdk/phpcpd:^9.0
 composer require --dev phpmetrics/phpmetrics
 ```
 
-With `tool: auto`, Catraca tries the centrally defined fallback order and skips a gate only when none of its candidates is installed. An explicitly selected missing tool is reported without silently switching tools. Security audit uses `composer audit` (built-in) and 14 source-code checks.
+With `tool: auto`, Catraca tries the centrally defined fallback order and skips a gate only when none of its candidates is installed. An explicitly selected missing tool is reported without silently switching tools. Security audit uses `composer audit` (built-in) and 16 source-code checks.
 
 ## Usage
 
@@ -82,7 +82,7 @@ Default baseline:
 | Setting | Default |
 |---------|---------|
 | Source Dirs | `["src", "app", "lib"]` |
-| Security | 0 advisories, 14 checks all enabled |
+| Security | 0 advisories, 16 checks all enabled |
 | Code Style | 0 violations |
 | Static Analysis | Current Mago, PHPStan, or Psalm error count captured by `init` |
 | Test Coverage | 85% minimum |
@@ -394,9 +394,13 @@ Catraca auto-detects AI agents (Cursor, Claude Code, OpenCode, Gemini CLI, Codex
       "message": "Fix 3 PHPStan errors",
       "files": ["app/Service.php:42", "app/Repository.php:15"]
     }
-  ]
+  ],
+  "time": "00:00:03.214567",
+  "memory": "12.50 MB"
 }
 ```
+
+The `time` field shows wall-clock execution time (`hh:mm:ss.μμμμμμ` — microsecond precision) and `memory` shows peak memory usage (`B`, `KB`, `MB`, `GB`, `TB`). Both appear in all output formats (JSON, Human, GitHub, JUnit, SARIF).
 
 ### GitHub Actions
 
@@ -404,10 +408,10 @@ Uses `::error::`, `::warning::`, and `::group::` annotations for native GitHub i
 
 ### Security Gate
 
-The Security gate runs `composer audit` (always) plus 14 source-code checks (all enabled by default):
+The Security gate runs `composer audit` (always) plus 16 source-code checks (all enabled by default):
 
 | Rule | What it detects |
-  |------|-----------------|
+|------|-----------------|
 | `hardcoded_secrets` | API keys, tokens, private keys, and other credentials in source code |
 | `sql_injection` | Raw SQL with interpolated variables (`DB::select("...$var")`, `whereRaw`) |
 | `command_injection` | `exec`/`shell_exec`/`system`/`passthru` with unsanitized variables |
@@ -422,6 +426,8 @@ The Security gate runs `composer audit` (always) plus 14 source-code checks (all
 | `weak_cryptography` | `mcrypt_*`, ECB mode, DES/3DES/RC4, `md5`/`sha1` in security contexts |
 | `cors_config` | `Access-Control-Allow-Origin: *` with credentials in Laravel CORS config |
 | `npm_audit` | Known vulnerabilities in npm packages (if `package-lock.json` exists) |
+| `laravel_owasp` | Mass-assignment gaps, dynamic column-name SQLi, and other Laravel-specific OWASP patterns |
+| `gitleaks` | Git-aware, cross-language hardcoded-secret scanning via [gitleaks](https://github.com/gitleaks/gitleaks) |
 
 All rules are configurable in `catraca_baseline.json` under `security.rules`. Set any rule to `false` to disable it:
 
@@ -443,13 +449,54 @@ All rules are configurable in `catraca_baseline.json` under `security.rules`. Se
       "package_freshness": true,
       "weak_cryptography": true,
       "cors_config": true,
-      "npm_audit": false
+      "npm_audit": false,
+      "gitleaks": true
     }
   }
 }
 ```
 
 CSRF and CORS checks only apply to Laravel projects — they are **skipped** (not failed) when no Laravel directory structure is detected.
+
+#### gitleaks — optional external secret scanner
+
+The `gitleaks` rule wraps [gitleaks](https://github.com/gitleaks/gitleaks), a git-aware,
+cross-language secret scanner. Unlike the built-in `hardcoded_secrets` check (regex-based,
+PHP-only), gitleaks scans **all file types** (`.env`, YAML, shell scripts, frontend code) using
+200+ detection rules with entropy analysis.
+
+**How it works:**
+
+- Catraca resolves the `gitleaks` binary from `vendor/bin/gitleaks`, then `$PATH`.
+- If gitleaks is **not installed**, the rule is **skipped silently** — it never fails the gate
+  (matching catraca's `missing_tool: skip` policy).
+- When installed, catraca runs `gitleaks detect --no-git` on the repository root (working-tree
+  scan, no history) and folds any findings into the security gate. Secrets are **redacted** in the
+  report so they never appear in gate output.
+- Standard noise paths (`vendor/`, `node_modules/`, `storage/`, `.git/`, `bootstrap/cache/`) are
+  filtered out automatically.
+- Your project controls detection rules and allowlists via a `.gitleaks.toml` at the repo root
+  (gitleaks auto-discovers it). This is the recommended way to allowlist test fixtures or doc
+  examples that contain known dummy secrets.
+
+**Installing gitleaks:**
+
+```bash
+# macOS
+brew install gitleaks
+
+# Linux (Debian/Ubuntu 24.04+)
+sudo apt install gitleaks
+
+# Docker (no install)
+docker run -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source=/repo
+
+# Go
+go install github.com/gitleaks/gitleaks/v8@latest
+```
+
+See the [gitleaks documentation](https://github.com/gitleaks/gitleaks) for configuration,
+custom rules, and CI integration.
 
 ## Performance Gate
 

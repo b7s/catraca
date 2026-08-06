@@ -59,6 +59,12 @@ class GithubFormatter
             count($result->getGates()),
         );
 
+        $time = $result->getTime();
+        $memory = $result->getMemory();
+        if ($time !== null && $memory !== null) {
+            $lines[] = sprintf('Time: %s — Memory: %s', $time, $memory);
+        }
+
         $actions = $result->getActions();
         if (count($actions) > 0) {
             $lines[] = '';

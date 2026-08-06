@@ -1,0 +1,10 @@
+title = "catraca gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures contain known example/dummy secrets (e.g. the AWS docs example key) used to prove detection works."
+paths = [
+    '''tests/.*\.php$''',
+]
