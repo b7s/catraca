@@ -92,6 +92,12 @@ final class GitleaksScanner
             }
 
             $file = (string) ($item['File'] ?? '');
+            // gitleaks may report absolute paths when --source is absolute;
+            // normalize to relative so the exclude filter and output stay clean
+            $rootPrefix = $this->root . '/';
+            if (str_starts_with($file, $rootPrefix)) {
+                $file = substr($file, strlen($rootPrefix));
+            }
             if ($file === '' || $this->isExcludedPath($file)) {
                 continue;
             }
